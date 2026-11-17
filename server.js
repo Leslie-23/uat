@@ -61,8 +61,17 @@ function requireRole(minRole) {
 }
 
 const app = express();
+app.set('trust proxy', true); // Vercel sits in front of this — read the real client IP from X-Forwarded-For, not the proxy's own.
 app.use(express.json({ limit: '6mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Passive forensic trail — never surfaced in the main UI, not shown to
+// testers, only readable by querying the database directly (or a future
+// admin-only endpoint). Supplements the self-typed tester name; doesn't
+// replace it.
+function clientInfo(req) {
+  return { ip: req.ip, userAgent: req.headers['user-agent'] || '' };
+}
 
 // POST /api/auth  { password }
 app.post('/api/auth', async (req, res) => {
@@ -149,7 +158,7 @@ app.post('/api/results', async (req, res) => {
     if (comments !== undefined) patch.comments = comments;
     await db.collection('results').updateOne({ _id: docId }, { $set: patch }, { upsert: true });
     // Append-only audit trail — every change, never overwritten.
-    await db.collection('history').insertOne({ caseId, app: appId, platform, tester, result, comments, changedAt: now });
+    await db.collection('history').insertOne({ caseId, app: appId, platform, tester, result, comments, changedAt: now, ...clientInfo(req) });
     res.json({ ok: true, id: docId });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -168,7 +177,7 @@ app.get('/api/attachments', async (req, res) => {
     if (req.query.caseId) filter.caseId = req.query.caseId;
     if (req.query.platform) filter.platform = req.query.platform;
     const docs = await db.collection('attachments')
-      .find(filter, { projection: { image: 0 } }) // list view never sends image bytes
+      .find(filter, { projection: { image: 0, ip: 0, userAgent: 0 } }) // list view never sends image bytes or forensic fields
       .sort({ createdAt: -1 }).toArray();
     res.json(docs);
   } catch (e) {
@@ -200,7 +209,7 @@ app.post('/api/attachments', async (req, res) => {
     const db = await getDb();
     const doc = {
       caseId, app: appId, platform, tester, image, filename: filename || 'screenshot.png',
-      mimeType: mimeType || 'image/png', createdAt: new Date(),
+      mimeType: mimeType || 'image/png', createdAt: new Date(), ...clientInfo(req),
     };
     const r = await db.collection('attachments').insertOne(doc);
     res.json({ ok: true, id: r.insertedId });
@@ -224,7 +233,7 @@ app.get('/api/comments', async (req, res) => {
   try {
     const db = await getDb();
     const filter = req.query.app ? { app: req.query.app } : {};
-    const docs = await db.collection('comments').find(filter).sort({ createdAt: -1 }).limit(200).toArray();
+    const docs = await db.collection('comments').find(filter, { projection: { ip: 0, userAgent: 0 } }).sort({ createdAt: -1 }).limit(200).toArray();
     res.json(docs);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -238,7 +247,7 @@ app.post('/api/comments', async (req, res) => {
       return res.status(400).json({ error: 'app, tester, and text are required' });
     }
     const db = await getDb();
-    const doc = { app: appId, tester, text: text.trim(), createdAt: new Date() };
+    const doc = { app: appId, tester, text: text.trim(), createdAt: new Date(), ...clientInfo(req) };
     const r = await db.collection('comments').insertOne(doc);
     res.json({ ok: true, id: r.insertedId });
   } catch (e) {
@@ -262,6 +271,32 @@ app.post('/api/admin/password', async (req, res) => {
       { upsert: true }
     );
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Forensic-only views — the ip/userAgent fields every write already
+// carries, just never shown on the tester-facing endpoints above.
+app.get('/api/admin/comments', async (req, res) => {
+  try {
+    const db = await getDb();
+    const filter = req.query.app ? { app: req.query.app } : {};
+    const docs = await db.collection('comments').find(filter).sort({ createdAt: -1 }).limit(200).toArray();
+    res.json(docs);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/attachments', async (req, res) => {
+  try {
+    const db = await getDb();
+    const filter = {};
+    if (req.query.app) filter.app = req.query.app;
+    if (req.query.caseId) filter.caseId = req.query.caseId;
+    const docs = await db.collection('attachments').find(filter, { projection: { image: 0 } }).sort({ createdAt: -1 }).toArray();
+    res.json(docs);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
