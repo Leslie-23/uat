@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UAT Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --bg:#f5f3ee; --surface:#ffffff; --surface-2:#faf8f3; --border:#e2ddd0;
+    --fg:#20231f; --fg-muted:#6b6a5f; --accent:#1f6f4a; --accent-fg:#ffffff;
+    --pass:#1f6f4a; --pass-bg:#e4f1e9; --fail:#b3261e; --fail-bg:#fbe8e7;
+    --blocked:#9a6a00; --blocked-bg:#fbf0d9; --na:#6b6a5f; --na-bg:#eceae1;
+    --notrun-bg:#eceae1;
+    --font-display:'IBM Plex Sans',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#000000; --surface:#121212; --surface-2:#1a1a1a; --border:#2a2a2a;
+      --fg:#f0f0f0; --fg-muted:#9a9a9a; --accent:#5fcf9a; --accent-fg:#06160f;
+      --pass:#5fcf9a; --pass-bg:#0f2a1c; --fail:#ff6b61; --fail-bg:#2a1210;
+      --blocked:#e8b84b; --blocked-bg:#2a2008; --na:#9a9a9a; --na-bg:#1f1f1f;
+      --notrun-bg:#1f1f1f; color-scheme:dark;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-display);line-height:1.45}
+  .gutter{padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px))}
+
+  header{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--border)}
+  .header-inner{padding-block:14px 10px}
+  .header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  h1{font-size:17px;font-weight:700;margin:0 0 2px;letter-spacing:-.01em}
+  .subtitle{font-size:12.5px;color:var(--fg-muted);margin:0 0 12px}
+  .role-badge{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--fg-muted);border:1px solid var(--border);white-space:nowrap}
+  .role-badge.admin{color:var(--accent);border-color:var(--accent)}
+  .header-actions{display:flex;gap:6px;align-items:center}
+  .icon-btn{font-family:var(--font-mono);font-size:11px;font-weight:600;padding:5px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+  .icon-btn:hover{color:var(--fg)}
+
+  .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;flex-wrap:wrap}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto;font-family:var(--font-mono);font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+  .tab[aria-selected="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+  .tab-divider{width:1px;align-self:stretch;background:var(--border);margin:0 2px}
+
+  .progress-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .progress-track{flex:1;min-width:0;height:6px;border-radius:999px;background:var(--border);overflow:hidden;display:flex}
+  .progress-track span{height:100%}
+  .progress-label{font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .conn{font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);margin-left:8px}
+  .conn.err{color:var(--fail)}
+
+  .platform-row{display:flex;gap:6px;margin-top:10px}
+  .platform-chip{font-family:var(--font-mono);font-size:11.5px;font-weight:600;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+  .platform-chip[aria-pressed="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
+
+  .filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .filter-chip{font-family:var(--font-mono);font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--fg-muted);cursor:pointer}
+  .filter-chip[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);border-color:var(--fg-muted)}
+
+  main{max-width:720px;margin:0 auto;padding-block:16px 48px}
+  .case-grid{display:block}
+  @media (min-width:860px){
+    main{max-width:1200px}
+    .case-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:12px;align-items:start}
+    .case-grid .card{margin-bottom:0}
+  }
+  @media (min-width:1300px){ main{max-width:1560px} }
+
+  .empty{padding:48px 0;text-align:center;color:var(--fg-muted)}
+  .empty strong{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
+
+  .tester-bar{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:14px}
+  .tester-bar input{flex:1;min-width:0;border:none;background:transparent;font-family:var(--font-display);font-size:13.5px;color:var(--fg)}
+  .tester-bar input:focus{outline:none}
+  .tester-bar .lbl{font-size:11.5px;color:var(--fg-muted);white-space:nowrap}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden}
+  .card-head{display:flex;gap:10px;align-items:flex-start;padding:13px 14px;cursor:pointer}
+  .case-id{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--fg-muted);flex:0 0 auto;padding-top:2px}
+  .case-main{flex:1;min-width:0}
+  .case-scenario{font-size:14px;font-weight:600;margin:0 0 3px}
+  .case-module{font-size:11.5px;color:var(--fg-muted)}
+  .case-right{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .pill{font-family:var(--font-mono);font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap}
+  .pill.pass{color:var(--pass);background:var(--pass-bg)}
+  .pill.fail{color:var(--fail);background:var(--fail-bg)}
+  .pill.blocked{color:var(--blocked);background:var(--blocked-bg)}
+  .pill.na, .pill.notrun{color:var(--na);background:var(--na-bg)}
+  .prio{font-size:10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.04em}
+
+  .card-body{padding:0 14px 14px;display:none}
+  .card.open .card-body{display:block}
+  .field-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);margin:10px 0 4px}
+  .steps, .expected{font-size:13px;white-space:pre-line;color:var(--fg)}
+  .expected{background:var(--surface-2);border-radius:8px;padding:8px 10px}
+
+  .result-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .result-btn{font-family:var(--font-mono);font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+  .result-btn[aria-pressed="true"].pass{background:var(--pass-bg);color:var(--pass);border-color:var(--pass)}
+  .result-btn[aria-pressed="true"].fail{background:var(--fail-bg);color:var(--fail);border-color:var(--fail)}
+  .result-btn[aria-pressed="true"].blocked{background:var(--blocked-bg);color:var(--blocked);border-color:var(--blocked)}
+  .result-btn[aria-pressed="true"].na{background:var(--na-bg);color:var(--na);border-color:var(--na)}
+
+  .comment-box{width:100%;margin-top:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical;min-height:40px}
+  .comment-box:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .save-state{font-size:11px;color:var(--fg-muted);margin-top:6px;min-height:14px}
+  .save-state.saved{color:var(--pass)}
+
+  .chev{flex:0 0 auto;color:var(--fg-muted);font-size:12px;padding-top:3px;transition:transform .15s}
+  .card.open .chev{transform:rotate(90deg)}
+
+  .shot-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .shot-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border)}
+  .shot-thumb img{width:100%;height:100%;object-fit:cover;cursor:pointer}
+  .shot-thumb button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:999px;border:none;background:var(--fail);color:#fff;font-size:11px;line-height:18px;text-align:center;cursor:pointer;padding:0}
+  .shot-add{width:64px;height:64px;border-radius:8px;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .shot-add input{display:none}
+  .shot-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;padding:24px}
+  .shot-lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+
+  /* General notes (app-level, not tied to a case) */
+  .notes-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
+  .notes-title{font-size:13px;font-weight:600;margin:0 0 8px}
+  .notes-form{display:flex;gap:8px;margin-bottom:10px}
+  .notes-form textarea{flex:1;min-height:40px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical}
+  .notes-form button{font-family:var(--font-mono);font-size:12px;font-weight:600;padding:0 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer}
+  .note-row{padding:8px 0;border-top:1px solid var(--border);font-size:13px}
+  .note-row:first-child{border-top:none}
+  .note-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);margin-bottom:2px}
+
+  /* Login gate */
+  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .login-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px}
+  .login-card h2{font-size:17px;margin:0 0 4px}
+  .login-card p{font-size:12.5px;color:var(--fg-muted);margin:0 0 18px}
+  .login-card input{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:14px;margin-bottom:10px}
+  .login-card input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .login-card button{width:100%;padding:11px;border-radius:9px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);font-family:var(--font-mono);font-weight:600;font-size:13px;cursor:pointer}
+  .login-err{color:var(--fail);font-size:12.5px;margin-top:8px;min-height:16px}
+
+  /* Summary table */
+  .summary-table{width:100%;border-collapse:collapse;font-size:13px}
+  .summary-table th,.summary-table td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border)}
+  .summary-table th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;color:var(--fg-muted);letter-spacing:.04em}
+  .summary-table td.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  .summary-bar{width:80px;height:6px;border-radius:999px;background:var(--border);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:8px}
+  .summary-bar span{display:block;height:100%;background:var(--accent)}
+
+  .history-row{padding:10px 0;border-top:1px solid var(--border);font-size:13px}
+  .history-row:first-child{border-top:none}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen" hidden>
+  <div class="login-card">
+    <h2>UAT Tracker</h2>
+    <p>Enter the access passphrase to continue.</p>
+    <input type="password" id="loginPassword" placeholder="Passphrase" autocomplete="current-password">
+    <button id="loginBtn">Continue</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+<header class="gutter">
+  <div class="header-inner">
+    <div class="header-top">
+      <div>
+        <h1>UAT Tracker</h1>
+        <p class="subtitle">Walk through each case on the app, pick a result, add a note if anything's off.</p>
+      </div>
+      <div class="header-actions">
+        <span class="role-badge" id="roleBadge"></span>
+        <button class="icon-btn" id="adminSettingsBtn" hidden>Change passphrase</button>
+        <button class="icon-btn" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="platform-row" id="platformRow"></div>
+    <div class="progress-row" id="progressRow">
+      <div class="progress-track" id="progressTrack"></div>
+      <span class="progress-label" id="progressLabel">0 / 0</span>
+      <span class="conn" id="connState"></span>
+    </div>
+    <div class="filter-row" id="filterRow"></div>
+  </div>
+</header>
+
+<main class="gutter" id="main">
+  <div class="empty"><strong>Loading…</strong></div>
+</main>
+</div>
+
+<script>
+(function(){
+  var APPS = [
+    {id:"vip", label:"VIP"},
+    {id:"goride", label:"GoRide"},
+    {id:"godriver", label:"GoDriver"},
+    {id:"tapngo", label:"Tap n Go"},
+    {id:"moveet", label:"Moveet"}
+  ];
+  var RESULTS = [
+    {key:"Pass", cls:"pass"},
+    {key:"Fail", cls:"fail"},
+    {key:"Blocked", cls:"blocked"},
+    {key:"N/A", cls:"na"}
+  ];
+  var FILTERS = ["All", "Pass", "Fail", "Blocked", "N/A", "Not run"];
+  var PILL_CLASS = {"Pass":"pass", "Fail":"fail", "Blocked":"blocked", "N/A":"na", "Not run":"notrun"};
+  var POLL_MS = 5000;
+
+  var PLATFORMS = [
+    {id:"ios", label:"iOS"},
+    {id:"android", label:"Android"}
+  ];
+
+  var state = {
+    view: "cases",       // "cases" | "summary" | "history"
+    app: APPS[0].id,
+    platform: "ios",     // "ios" | "android" — same case list, independent outcomes per platform
+    filter: "All",
+    cases: {},
+    results: {ios: {}, android: {}},       // results[platform][caseId]
+    attachments: {ios: {}, android: {}},   // attachments[platform][caseId]
+    comments: {},
+    tester: "", openCard: null, loaded: {}, resultsLoaded: {ios: {}, android: {}}, pollTimer: null,
+    auth: null           // {token, role}
+  };
+
+  try { state.tester = localStorage.getItem("uat_tester") || ""; } catch(e){}
+  try { state.platform = localStorage.getItem("uat_platform") || "ios"; } catch(e){}
+  try {
+    var saved = localStorage.getItem("uat_auth");
+    if (saved) state.auth = JSON.parse(saved);
+  } catch(e){}
+
+  function el(tag, props, children){
+    var e = document.createElement(tag);
+    if (props) for (var k in props) {
+      if (k === "class") e.className = props[k];
+      else if (k === "text") e.textContent = props[k];
+      else if (k.indexOf("on") === 0) e.addEventListener(k.slice(2), props[k]);
+      else e.setAttribute(k, props[k]);
+    }
+    (children||[]).forEach(function(c){ if (c) e.appendChild(c); });
+    return e;
+  }
+
+  function api(path, opts){
+    opts = opts || {};
+    var headers = Object.assign({}, opts.headers || {});
+    if (state.auth && state.auth.token) headers["Authorization"] = "Bearer " + state.auth.token;
+    return fetch(path, Object.assign({}, opts, {headers: headers})).then(function(r){
+      if (r.status === 401) { logout(); throw new Error("not_authenticated"); }
+      return r;
+    });
+  }
+
+  function isTypingInMain(){
+    var active = document.activeElement;
+    var main = document.getElementById("main");
+    if (!active || !main || !main.contains(active)) return false;
+    return active.tagName === "TEXTAREA" || active.tagName === "INPUT";
+  }
+
+  function setConn(text, isErr){
+    var n = document.getElementById("connState");
+    if (!n) return;
+    n.textContent = text || "";
+    n.classList.toggle("err", !!isErr);
+  }
+
+  // ---------------- auth ----------------
+  function showLogin(err){
+    document.getElementById("app").hidden = true;
+    document.getElementById("loginScreen").hidden = false;
+    document.getElementById("loginErr").textContent = err || "";
+  }
+
+  function logout(){
+    state.auth = null;
+    try { localStorage.removeItem("uat_auth"); } catch(e){}
+    clearInterval(state.pollTimer);
+    showLogin("");
+  }
+
+  function doLogin(){
+    var pw = document.getElementById("loginPassword").value;
+    if (!pw) return;
+    fetch("/api/auth", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({password: pw})
+    }).then(function(r){ return r.json().then(function(b){ return {ok: r.ok, body: b}; }); })
+      .then(function(res){
+        if (!res.ok) { document.getElementById("loginErr").textContent = "Wrong passphrase."; return; }
+        state.auth = {token: res.body.token, role: res.body.role};
+        try { localStorage.setItem("uat_auth", JSON.stringify(state.auth)); } catch(e){}
+        boot();
+      })
+      .catch(function(){ document.getElementById("loginErr").textContent = "Couldn't reach the server."; });
+  }
+
+  // ---------------- header / tabs ----------------
+  function renderTabs(){
+    var tabs = document.getElementById("tabs");
+    tabs.innerHTML = "";
+    APPS.forEach(function(a){
+      tabs.appendChild(el("button", {
+        class: "tab", role: "tab", "aria-selected": String(state.view === "cases" && a.id === state.app),
+        text: a.label,
+        onclick: function(){ state.view = "cases"; state.app = a.id; afterTabChange(); }
+      }));
+    });
+    if (state.auth && state.auth.role === "admin") {
+      tabs.appendChild(el("span", {class: "tab-divider"}));
+      ["summary","history"].forEach(function(v){
+        tabs.appendChild(el("button", {
+          class: "tab", role: "tab", "aria-selected": String(state.view === v),
+          text: v === "summary" ? "Summary" : "History",
+          onclick: function(){ state.view = v; afterTabChange(); }
+        }));
+      });
+    }
+  }
+
+  function afterTabChange(){
+    renderTabs();
+    renderPlatforms();
+    document.getElementById("progressRow").hidden = state.view !== "cases";
+    document.getElementById("filterRow").hidden = state.view !== "cases";
+    if (state.view === "cases") loadApp(state.app);
+    else if (state.view === "summary") renderSummary();
+    else if (state.view === "history") renderHistory();
+  }
+
+  function renderPlatforms(){
+    var row = document.getElementById("platformRow");
+    row.hidden = state.view !== "cases";
+    row.innerHTML = "";
+    PLATFORMS.forEach(function(p){
+      row.appendChild(el("button", {
+        class: "platform-chip", "aria-pressed": String(state.platform === p.id), text: p.label,
+        onclick: function(){
+          if (state.platform === p.id) return;
+          state.platform = p.id;
+          try { localStorage.setItem("uat_platform", p.id); } catch(e){}
+          renderPlatforms();
+          loadApp(state.app);
+        }
+      }));
+    });
+  }
+
+  function renderFilters(){
+    var row = document.getElementById("filterRow");
+    row.innerHTML = "";
+    FILTERS.forEach(function(f){
+      row.appendChild(el("button", {
+        class: "filter-chip", "aria-pressed": String(state.filter === f), text: f,
+        onclick: function(){ state.filter = f; renderList(); }
+      }));
+    });
+  }
+
+  function updateProgress(){
+    var cases = state.cases[state.app] || [];
+    var track = document.getElementById("progressTrack");
+    var label = document.getElementById("progressLabel");
+    track.innerHTML = "";
+    if (!cases.length) { label.textContent = "0 / 0"; return; }
+    var counts = {Pass:0, Fail:0, Blocked:0, "N/A":0, done:0};
+    var resultsForPlatform = state.results[state.platform] || {};
+    cases.forEach(function(c){
+      var r = resultsForPlatform[c.id];
+      if (r && r.result && r.result !== "Not run") { counts.done++; counts[r.result] = (counts[r.result]||0)+1; }
+    });
+    [["Pass"],["Fail"],["Blocked"],["N/A"]].forEach(function(pair){
+      var n = counts[pair[0]] || 0;
+      if (!n) return;
+      var seg = el("span", {style: "width:" + (100*n/cases.length) + "%"});
+      seg.style.background = pair[0] === "Pass" ? "var(--pass)" : pair[0] === "Fail" ? "var(--fail)" : pair[0] === "Blocked" ? "var(--blocked)" : "var(--na)";
+      track.appendChild(seg);
+    });
+    label.textContent = counts.done + " / " + cases.length;
+  }
+
+  var saveTimers = {};
+  function saveResult(caseId, patch){
+    var platform = state.platform;
+    var existing = state.results[platform][caseId] || {};
+    var next = Object.assign({}, existing, patch, {
+      caseId: caseId, app: state.app, platform: platform, tester: state.tester || "anonymous"
+    });
+    state.results[platform][caseId] = next;
+    api("/api/results", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(next)
+    }).then(function(r){ if (!r.ok) throw new Error("save failed"); setConn("", false); })
+      .catch(function(){ setConn("Couldn't save — retrying", true); });
+  }
+
+  function matchesFilter(c){
+    if (state.filter === "All") return true;
+    var r = state.results[state.platform][c.id];
+    var key = (r && r.result) || "Not run";
+    return key === state.filter;
+  }
+
+  function renderCard(c){
+    var r = state.results[state.platform][c.id] || {};
+    var resultKey = r.result || "Not run";
+    var pillCls = PILL_CLASS[resultKey] || "notrun";
+
+    var card = el("div", {class: "card" + (state.openCard === c.id ? " open" : "")});
+    var pill = el("span", {class: "pill " + pillCls, text: resultKey});
+    var prio = el("span", {class: "prio", text: c.priority || ""});
+    var right = el("div", {class: "case-right"}, [pill, prio]);
+
+    var head = el("div", {
+      class: "card-head",
+      onclick: function(){ state.openCard = (state.openCard === c.id) ? null : c.id; renderList(); }
+    }, [
+      el("span", {class: "case-id", text: c.id}),
+      el("div", {class: "case-main"}, [
+        el("p", {class: "case-scenario", text: c.scenario}),
+        el("p", {class: "case-module", text: c.module})
+      ]),
+      right,
+      el("span", {class: "chev", text: "›"})
+    ]);
+    card.appendChild(head);
+
+    var body = el("div", {class: "card-body"});
+    body.appendChild(el("p", {class: "field-label", text: "Steps to follow"}));
+    body.appendChild(el("p", {class: "steps", text: c.steps}));
+    body.appendChild(el("p", {class: "field-label", text: "Expected result"}));
+    body.appendChild(el("p", {class: "expected", text: c.expected}));
+
+    var resultRow = el("div", {class: "result-row"});
+    RESULTS.forEach(function(opt){
+      var pressed = resultKey === opt.key;
+      resultRow.appendChild(el("button", {
+        class: "result-btn " + opt.cls, "aria-pressed": String(pressed), text: opt.key,
+        onclick: function(){ saveResult(c.id, {result: opt.key}); renderList(); }
+      }));
+    });
+    body.appendChild(resultRow);
+
+    var comment = el("textarea", {class: "comment-box", placeholder: "Anything odd? Describe what you saw…"});
+    comment.value = r.comments || "";
+    var saveState = el("div", {class: "save-state"});
+    comment.addEventListener("blur", function(){ renderList(); });
+    comment.addEventListener("input", function(){
+      saveState.textContent = ""; saveState.classList.remove("saved");
+      clearTimeout(saveTimers[c.id]);
+      var val = comment.value;
+      saveTimers[c.id] = setTimeout(function(){
+        saveResult(c.id, {comments: val});
+        saveState.textContent = "Saved"; saveState.classList.add("saved");
+      }, 700);
+    });
+    body.appendChild(comment);
+    body.appendChild(saveState);
+
+    var isOpen = state.openCard === c.id;
+    body.appendChild(el("p", {class: "field-label", text: "Screenshots"}));
+    var shotRow = el("div", {class: "shot-row"});
+    var attachments = state.attachments[state.platform][c.id] || [];
+    if (isOpen) {
+      attachments.forEach(function(a){
+        var thumb = el("div", {class: "shot-thumb"});
+        var img = el("img", {alt: a.filename || "screenshot"});
+        loadAttachmentImage(a._id, img);
+        img.addEventListener("click", function(){ openLightbox(a._id); });
+        var rm = el("button", {
+          text: "×",
+          onclick: function(ev){ ev.stopPropagation(); deleteAttachment(a._id, c.id); }
+        });
+        thumb.appendChild(img); thumb.appendChild(rm);
+        shotRow.appendChild(thumb);
+      });
+      var addLabel = el("label", {class: "shot-add", text: "+"});
+      var fileInput = el("input", {type: "file", accept: "image/*"});
+      fileInput.addEventListener("change", function(){
+        var file = fileInput.files[0];
+        if (file) uploadAttachment(c.id, file);
+      });
+      addLabel.appendChild(fileInput);
+      shotRow.appendChild(addLabel);
+    } else if (attachments.length) {
+      shotRow.appendChild(el("span", {class: "case-module", text: attachments.length + " attached — open the case to view"}));
+    }
+    body.appendChild(shotRow);
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function loadAttachmentImage(id, imgEl){
+    api("/api/attachments/" + id + "/image").then(function(r){ return r.json(); })
+      .then(function(data){ imgEl.src = "data:" + data.mimeType + ";base64," + data.image; })
+      .catch(function(){});
+  }
+
+  function openLightbox(id){
+    api("/api/attachments/" + id + "/image").then(function(r){ return r.json(); }).then(function(data){
+      var box = el("div", {class: "shot-lightbox", onclick: function(){ box.remove(); }});
+      box.appendChild(el("img", {src: "data:" + data.mimeType + ";base64," + data.image}));
+      document.body.appendChild(box);
+    }).catch(function(){});
+  }
+
+  function uploadAttachment(caseId, file){
+    var platform = state.platform;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var dataUrl = reader.result;
+      var base64 = dataUrl.split(",")[1];
+      api("/api/attachments", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          caseId: caseId, app: state.app, platform: platform, tester: state.tester || "anonymous",
+          image: base64, filename: file.name, mimeType: file.type || "image/png"
+        })
+      }).then(function(r){ return r.json().then(function(b){ return {ok:r.ok, body:b}; }); })
+        .then(function(res){
+          if (!res.ok) { alert(res.body.error || "Could not upload."); return; }
+          return loadAttachments(state.app, platform).then(renderList);
+        }).catch(function(){ alert("Could not reach the server."); });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function deleteAttachment(id, caseId){
+    var platform = state.platform;
+    api("/api/attachments/" + id, {method: "DELETE"})
+      .then(function(){ return loadAttachments(state.app, platform); })
+      .then(renderList)
+      .catch(function(){});
+  }
+
+  function loadAttachments(appId, platform){
+    return api("/api/attachments?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform))
+      .then(function(r){ return r.json(); })
+      .then(function(rows){
+        var byCase = {};
+        rows.forEach(function(a){ (byCase[a.caseId] = byCase[a.caseId] || []).push(a); });
+        state.attachments[platform] = byCase;
+      }).catch(function(){});
+  }
+
+  function renderNotes(){
+    var box = el("div", {class: "notes-box"});
+    box.appendChild(el("p", {class: "notes-title", text: "General notes for this app"}));
+    var form = el("div", {class: "notes-form"});
+    var ta = el("textarea", {placeholder: "Anything worth flagging that isn't tied to one case?"});
+    var btn = el("button", {text: "Post"});
+    btn.addEventListener("click", function(){
+      var text = ta.value.trim();
+      if (!text) return;
+      api("/api/comments", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({app: state.app, tester: state.tester || "anonymous", text: text})
+      }).then(function(){ ta.value = ""; return loadComments(state.app); }).then(renderList);
+    });
+    form.appendChild(ta); form.appendChild(btn);
+    box.appendChild(form);
+    var list = (state.comments[state.app] || []);
+    if (!list.length) box.appendChild(el("p", {class: "note-row", text: "No notes yet."}));
+    list.forEach(function(n){
+      box.appendChild(el("div", {class: "note-row"}, [
+        el("div", {class: "note-meta", text: n.tester + " · " + new Date(n.createdAt).toLocaleString()}),
+        el("div", {text: n.text})
+      ]));
+    });
+    return box;
+  }
+
+  function renderList(){
+    if (state.view !== "cases") return;
+    var main = document.getElementById("main");
+    main.innerHTML = "";
+
+    var cases = state.cases[state.app];
+    if (!state.loaded[state.app] || !state.resultsLoaded[state.platform][state.app]) {
+      main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Loading " + state.app + "…"})]));
+      return;
+    }
+    if (!cases || !cases.length) {
+      main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "No test cases yet"})]));
+      return;
+    }
+
+    var bar = el("div", {class: "tester-bar"}, [
+      el("span", {class: "lbl", text: "Testing as"}),
+      (function(){
+        var input = el("input", {value: state.tester});
+        input.addEventListener("change", function(){
+          state.tester = input.value.trim();
+          try { localStorage.setItem("uat_tester", state.tester); } catch(e){}
+        });
+        return input;
+      })()
+    ]);
+    main.appendChild(bar);
+    main.appendChild(renderNotes());
+
+    var filtered = cases.filter(matchesFilter);
+    var grid = el("div", {class: "case-grid"});
+    if (!filtered.length) {
+      grid.appendChild(el("div", {class: "empty"}, [el("strong", {text: "No cases match this filter"})]));
+    } else {
+      filtered.forEach(function(c){ grid.appendChild(renderCard(c)); });
+    }
+    main.appendChild(grid);
+    updateProgress();
+  }
+
+  // ---------------- summary / history (admin) ----------------
+  function renderSummary(){
+    var main = document.getElementById("main");
+    main.innerHTML = "";
+    main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Loading summary…"})]));
+    api("/api/admin/summary").then(function(r){ return r.json(); }).then(function(rows){
+      main.innerHTML = "";
+      var table = el("table", {class: "summary-table"});
+      var head = el("tr", {}, ["App","Platform","Progress","Total","Pass","Fail","Blocked","N/A","Not run"].map(function(h){ return el("th", {text: h}); }));
+      table.appendChild(el("thead", {}, [head]));
+      var body = el("tbody");
+      var label = {};
+      APPS.forEach(function(a){ label[a.id] = a.label; });
+      var platformLabel = {}; PLATFORMS.forEach(function(p){ platformLabel[p.id] = p.label; });
+      rows.forEach(function(row){
+        var bar = el("span", {class: "summary-bar"}, [el("span", {style: "width:" + row.pct + "%"})]);
+        var progressCell = el("td", {}, [bar, document.createTextNode(row.pct + "%")]);
+        body.appendChild(el("tr", {}, [
+          el("td", {text: label[row.app] || row.app}),
+          el("td", {text: platformLabel[row.platform] || row.platform}),
+          progressCell,
+          el("td", {class: "num", text: String(row.total)}),
+          el("td", {class: "num", text: String(row.pass)}),
+          el("td", {class: "num", text: String(row.fail)}),
+          el("td", {class: "num", text: String(row.blocked)}),
+          el("td", {class: "num", text: String(row.na)}),
+          el("td", {class: "num", text: String(row.notRun)})
+        ]));
+      });
+      table.appendChild(body);
+      main.appendChild(table);
+    }).catch(function(){ main.innerHTML = ""; main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Couldn't load summary"})])); });
+  }
+
+  function renderHistory(){
+    var main = document.getElementById("main");
+    main.innerHTML = "";
+    main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Loading history…"})]));
+    api("/api/admin/history").then(function(r){ return r.json(); }).then(function(rows){
+      main.innerHTML = "";
+      if (!rows.length) { main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "No changes yet"})])); return; }
+      rows.forEach(function(h){
+        main.appendChild(el("div", {class: "history-row"}, [
+          el("div", {class: "note-meta", text: new Date(h.changedAt).toLocaleString() + " · " + h.app + " · " + (h.platform || "—") + " · " + h.caseId + " · " + h.tester}),
+          el("div", {text: (h.result || "(comment only)") + (h.comments ? " — " + h.comments : "")})
+        ]));
+      });
+    }).catch(function(){ main.innerHTML = ""; main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Couldn't load history"})])); });
+  }
+
+  // ---------------- data loading ----------------
+  function loadComments(appId){
+    return api("/api/comments?app=" + encodeURIComponent(appId)).then(function(r){ return r.json(); })
+      .then(function(rows){ state.comments[appId] = rows; })
+      .catch(function(){});
+  }
+
+  function fetchResults(appId, platform){
+    return api("/api/results?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform))
+      .then(function(r){ if (!r.ok) throw new Error("bad response"); return r.json(); })
+      .then(function(rows){
+        var byCase = {};
+        rows.forEach(function(row){ if (row.caseId) byCase[row.caseId] = row; });
+        state.results[platform] = byCase;
+        setConn("", false);
+      })
+      .catch(function(){ setConn("Offline — showing last known state", true); });
+  }
+
+  function loadApp(appId){
+    var platform = state.platform;
+    state.loaded[appId] = state.loaded[appId] || false;
+    renderFilters();
+    renderList();
+
+    var casesPromise = state.cases[appId]
+      ? Promise.resolve(state.cases[appId])
+      : api("/api/testcases?app=" + encodeURIComponent(appId)).then(function(r){ return r.json(); });
+
+    Promise.all([casesPromise, fetchResults(appId, platform), loadComments(appId), loadAttachments(appId, platform)]).then(function(res){
+      state.cases[appId] = res[0];
+      state.loaded[appId] = true;
+      state.resultsLoaded[platform][appId] = true;
+      renderList();
+    }).catch(function(){ setConn("Couldn't load — check the server", true); });
+
+    clearInterval(state.pollTimer);
+    state.pollTimer = setInterval(function(){
+      if (state.view === "cases") fetchResults(appId, state.platform).then(function(){
+        if (!isTypingInMain()) renderList();
+      });
+    }, POLL_MS);
+  }
+
+  // ---------------- admin: change passphrase ----------------
+  function wireAdminSettings(){
+    var btn = document.getElementById("adminSettingsBtn");
+    if (!state.auth || state.auth.role !== "admin") { btn.hidden = true; return; }
+    btn.hidden = false;
+    btn.onclick = function(){
+      var next = prompt("New tester passphrase (at least 4 characters):");
+      if (!next) return;
+      api("/api/admin/password", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({newPassword: next})
+      }).then(function(r){ return r.json().then(function(b){ return {ok: r.ok, body: b}; }); })
+        .then(function(res){
+          alert(res.ok ? "Tester passphrase updated." : (res.body.error || "Could not update."));
+        }).catch(function(){ alert("Could not reach the server."); });
+    };
+  }
+
+  // ---------------- boot ----------------
+  function boot(){
+    document.getElementById("loginScreen").hidden = true;
+    document.getElementById("app").hidden = false;
+    var badge = document.getElementById("roleBadge");
+    badge.textContent = state.auth.role === "admin" ? "admin" : "tester";
+    badge.classList.toggle("admin", state.auth.role === "admin");
+    wireAdminSettings();
+    document.getElementById("logoutBtn").onclick = logout;
+    renderTabs();
+    renderPlatforms();
+    loadApp(state.app);
+  }
+
+  document.getElementById("loginBtn").addEventListener("click", doLogin);
+  document.getElementById("loginPassword").addEventListener("keydown", function(ev){
+    if (ev.key === "Enter") doLogin();
+  });
+
+  if (state.auth && state.auth.token) {
+    boot();
+  } else {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>

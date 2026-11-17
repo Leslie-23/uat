@@ -1,0 +1,804 @@
+{
+ "vip": [
+  {
+   "id": "VIP-01",
+   "module": "Login",
+   "scenario": "Log in by phone OTP",
+   "steps": "1. Open the app.\n2. Enter your phone number.\n3. Enter the OTP code you receive by SMS.",
+   "expected": "You are logged in and land on Home.",
+   "priority": "High"
+  },
+  {
+   "id": "VIP-02",
+   "module": "Bus booking",
+   "scenario": "Book a scheduled trip",
+   "steps": "1. From Home, pick an origin and destination.\n2. Choose a scheduled departure.\n3. Select a seat.",
+   "expected": "You reach the payment step with the trip and seat held.",
+   "priority": "High"
+  },
+  {
+   "id": "VIP-03",
+   "module": "Bus booking",
+   "scenario": "Book an unscheduled trip",
+   "steps": "1. From Home, pick an unscheduled route.\n2. Pick a date within the booking window.",
+   "expected": "You reach the payment step.",
+   "priority": "High"
+  },
+  {
+   "id": "VIP-04",
+   "module": "Payment",
+   "scenario": "Pay by Mobile Money",
+   "steps": "1. At payment, choose MoMo.\n2. Pick your network (MTN/Telecel/AT).\n3. Enter the MoMo number.\n4. Approve the prompt on your phone.",
+   "expected": "Booking is confirmed and a boarding pass is issued.",
+   "priority": "High"
+  },
+  {
+   "id": "VIP-05",
+   "module": "Payment",
+   "scenario": "Pay by Tap n Go card",
+   "steps": "1. At payment, select the linked card.\n2. Enter the passcode.",
+   "expected": "Booking is confirmed and a boarding pass is issued.",
+   "priority": "High"
+  },
+  {
+   "id": "VIP-06",
+   "module": "Payment \u2014 edge case",
+   "scenario": "A MoMo payment fails or times out",
+   "steps": "1. Start a MoMo payment.\n2. Deliberately let it fail or time out (e.g. decline the prompt, or use a wallet with no funds).",
+   "expected": "The app clearly shows the payment failed \u2014 no crash, no grey/stuck screen \u2014 and lets you retry or pick another payment method.",
+   "priority": "High"
+  },
+  {
+   "id": "VIP-07",
+   "module": "My Tickets",
+   "scenario": "View a boarding pass",
+   "steps": "1. Open My Tickets from the side menu.\n2. Select a past booking.",
+   "expected": "The boarding pass / QR code is shown.",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-08",
+   "module": "Bus booking \u2014 edge case",
+   "scenario": "Try to book more seats than are available",
+   "steps": "1. Find a trip with very few seats left.\n2. Try to book more seats than remain.",
+   "expected": "The app blocks the booking with a clear message. It does not overbook or crash.",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-09",
+   "module": "Cards",
+   "scenario": "Manage your Tap n Go card",
+   "steps": "1. Open the Cards tab.\n2. Add a card or top it up.",
+   "expected": "The card balance updates correctly.",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-10",
+   "module": "Parcel",
+   "scenario": "Track a parcel",
+   "steps": "1. Open Parcel Tracking from the side menu.\n2. Enter or scan a tracking number.",
+   "expected": "The current parcel status is shown.",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-11",
+   "module": "Merchant mode",
+   "scenario": "Use merchant features (if you have a merchant account)",
+   "steps": "1. Open Merchant mode.\n2. Check Dashboard, sales History, and Settings.",
+   "expected": "Each screen should open and show real data if you can reach it. Note: confirmed in the code that nothing in the normal app actually links to Merchant mode \u2014 you likely won't find a way in at all, which is expected, not a bug you need to hunt for.",
+   "priority": "Low"
+  },
+  {
+   "id": "VIP-12",
+   "module": "Login \u2014 edge case",
+   "scenario": "Log in / book with a 025, 053, or 056 number",
+   "steps": "1. Try logging in with a 025 or 053 number.\n2. Then try booking a trip with the same number.\n3. Also try a 056 number if you have one.",
+   "expected": "Login and booking should accept the same numbers consistently. (Known issue: these currently behave differently between screens \u2014 note exactly what you see.)",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-13",
+   "module": "Account",
+   "scenario": "Set up a passcode as a new user",
+   "steps": "1. Create a brand-new account.\n2. Try to find where to set a name, emergency contact, and passcode.",
+   "expected": "You should be able to set these. (Known issue: this may not currently be reachable \u2014 note exactly what happens.)",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-14",
+   "module": "Search",
+   "scenario": "Search with an unusual destination",
+   "steps": "1. On Home, type something unusual or clear the From/To fields while a search is running.",
+   "expected": "The app should not crash.",
+   "priority": "Low"
+  },
+  {
+   "id": "VIP-15",
+   "module": "Older features",
+   "scenario": "Confirm Insurance, Market, Subscriptions, QR Pay, and Tickets are genuinely unreachable",
+   "steps": "1. Look through the app and side menu for an Insurance, Market, Subscriptions, QR Pay, or Tickets section.\n2. Try every reasonable path you can think of to find one.",
+   "expected": "Confirmed in the code: none of these have any button or menu item anywhere that opens them. You should not be able to find a way in \u2014 if you DO find one, that's a notable surprise worth reporting.",
+   "priority": "Low"
+  },
+  {
+   "id": "VIP-16",
+   "module": "Account",
+   "scenario": "Delete your account (real flow \u2014 test carefully, use a disposable test account)",
+   "steps": "1. Go to Settings/Profile > Security.\n2. Find 'Deactivate or Delete Account'.\n3. Choose Permanently Delete Account.\n4. Unlock with Face ID / passcode when asked.",
+   "expected": "This is a real, working flow (confirmed in code), not a stub \u2014 it should take you to a password/reset step to confirm the deletion. Use a disposable account, not your real one.",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-17",
+   "module": "Visual consistency",
+   "scenario": "Compare how different screens look as you move around",
+   "steps": "1. Visit Home, a booking screen, Cards, and My Tickets in turn.\n2. Compare the icons, buttons, and overall look.",
+   "expected": "Everything should feel like one consistent app \u2014 note anything that looks visually mismatched or out of place.",
+   "priority": "Low"
+  },
+  {
+   "id": "VIP-18",
+   "module": "Accessibility",
+   "scenario": "Check icon-only buttons are easy to understand",
+   "steps": "1. Look for buttons that are just an icon with no text label (e.g. in headers or toolbars).\n2. If your phone has a screen reader or larger-text accessibility setting, try turning it on and revisiting a couple of screens.",
+   "expected": "You should be able to tell what each icon-only button does. With accessibility settings on, screens should still be usable.",
+   "priority": "Low"
+  },
+  {
+   "id": "VIP-19",
+   "module": "Dark mode",
+   "scenario": "Switch your phone's dark mode on and off",
+   "steps": "1. Turn your phone's system dark mode on.\n2. Reopen the app.\n3. Turn it back off.",
+   "expected": "Note exactly what the app does \u2014 it likely stays the same regardless of your phone's setting. Describe what you see either way.",
+   "priority": "Low"
+  },
+  {
+   "id": "VIP-20",
+   "module": "App stability",
+   "scenario": "Check for anything that looks frozen while loading",
+   "steps": "1. On Home or a booking screen, do something that needs the network (search, open a list) on a slower connection if possible.",
+   "expected": "You should see some sign the app is working (a spinner or similar), not a blank or frozen-looking screen.",
+   "priority": "Low"
+  },
+  {
+   "id": "VIP-21",
+   "module": "Account",
+   "scenario": "Change or reset your passcode/password as an existing user",
+   "steps": "1. Log in as an existing user.\n2. Find where to change your passcode or password.\n3. Change it, then log out and log back in with the new one.",
+   "expected": "The change saves correctly and you can log in with the new passcode/password afterward.",
+   "priority": "Medium"
+  },
+  {
+   "id": "VIP-22",
+   "module": "Signup",
+   "scenario": "Sign up as a brand-new user, start to finish",
+   "steps": "1. From the start screen, choose to create a new account rather than log in.\n2. Go through every step asked of you.",
+   "expected": "The signup flow completes and you land on Home as a new user.",
+   "priority": "High"
+  }
+ ],
+ "goride": [
+  {
+   "id": "GOR-01",
+   "module": "Login",
+   "scenario": "Log in by phone OTP",
+   "steps": "1. Open the app.\n2. Enter your phone number.\n3. Enter the OTP code you receive by SMS.",
+   "expected": "You are logged in and land on Home.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-02",
+   "module": "App launch",
+   "scenario": "Open the app fresh (cold start)",
+   "steps": "1. Fully close the app.\n2. Reopen it from the home screen icon.",
+   "expected": "The app opens normally without crashing. Try this a few times across a day.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-03",
+   "module": "Ride-hailing",
+   "scenario": "Book an on-demand ride",
+   "steps": "1. On Home, set your pickup and destination.\n2. Choose GoRide, GoRide Comfort, or Pool.\n3. Confirm.",
+   "expected": "You are matched with a nearby driver.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-04",
+   "module": "Ride-hailing",
+   "scenario": "Haggle a fare with a driver",
+   "steps": "1. After requesting a ride, if prompted, try countering the driver's offered fare.",
+   "expected": "The haggle works smoothly and you can see the final agreed fare clearly.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-05",
+   "module": "Booking \u2014 edge case",
+   "scenario": "Book and cancel a ride repeatedly",
+   "steps": "1. Book a ride, then cancel it before pickup.\n2. Repeat 2-3 times.",
+   "expected": "Each booking and cancellation behaves correctly \u2014 no stuck/ghost ride left behind.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-06",
+   "module": "Journey planner",
+   "scenario": "Plan a multi-leg trip",
+   "steps": "1. Open the Travel tab.\n2. Enter an origin and destination that needs more than one leg (e.g. a trotro + bus).",
+   "expected": "A sensible route is shown with pricing, and you can book a leg of it.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-07",
+   "module": "Payments",
+   "scenario": "Use a card or MoMo for a ride/top-up",
+   "steps": "1. Open Wallet.\n2. Add/top up a card or pay via MoMo for a ride.",
+   "expected": "The balance, transaction status, and any QR code shown are all correct and match reality \u2014 not a stale or wrong amount.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-08",
+   "module": "Bookmarks",
+   "scenario": "Save and reuse a bookmark",
+   "steps": "1. Save a location, card, or journey as a bookmark.\n2. Close and reopen the app.\n3. Check the bookmark is still there and usable.",
+   "expected": "The bookmark persists and works correctly after reopening the app.",
+   "priority": "Medium-High"
+  },
+  {
+   "id": "GOR-09",
+   "module": "Navigation",
+   "scenario": "Use the side drawer heavily",
+   "steps": "1. Open the side drawer.\n2. Visit several screens in a row (Home, Travel, Wallet, Account, Help).\n3. Go back and forth several times.",
+   "expected": "Navigation stays smooth \u2014 no crash, no frozen screen, no wrong screen showing.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-10",
+   "module": "Bus booking",
+   "scenario": "Book a scheduled/unscheduled trip, including STC",
+   "steps": "1. From Travel, book a scheduled or unscheduled bus trip.\n2. If STC is offered as the company, try that specifically.",
+   "expected": "Booking completes and passenger details you type are not lost partway through.",
+   "priority": "High"
+  },
+  {
+   "id": "GOR-11",
+   "module": "Account",
+   "scenario": "Edit your bank account / card details",
+   "steps": "1. Open your saved bank account or card details.\n2. Edit and save a change.",
+   "expected": "The edit saves correctly without crashing.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOR-12",
+   "module": "Location search",
+   "scenario": "Search for a location, then open Bookmarks right after",
+   "steps": "1. Search for a pickup location.\n2. Immediately switch to the Bookmarks tab.\n3. Switch back.",
+   "expected": "No crash, no stale/wrong data shown in either tab.",
+   "priority": "Medium-High"
+  },
+  {
+   "id": "GOR-13",
+   "module": "Help & support",
+   "scenario": "View promotions, referrals, and about",
+   "steps": "1. Open Help from the drawer.\n2. Check Promotions, Referral, and About.",
+   "expected": "Each screen loads correctly and shows real content.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOR-14",
+   "module": "Trotro",
+   "scenario": "Browse trotro station information",
+   "steps": "1. Look for a Trotro section in the app.\n2. Open it and browse station info.",
+   "expected": "Confirmed in the code: nothing links to this screen anywhere. You should not find a way in \u2014 note if you unexpectedly do.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOR-15",
+   "module": "Trains",
+   "scenario": "Book or view a train trip",
+   "steps": "1. Look for a Trains section.\n2. Try to view or book a trip.",
+   "expected": "Confirmed in the code: nothing links to this screen anywhere. You should not find a way in \u2014 note if you unexpectedly do.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOR-16",
+   "module": "Notifications",
+   "scenario": "Check your notifications",
+   "steps": "1. Open the Notifications screen from the drawer.",
+   "expected": "Confirmed in the code: nothing links to this screen anywhere. You should not find a way in \u2014 note if you unexpectedly do.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOR-17",
+   "module": "Older features",
+   "scenario": "Confirm Trotro, Trains, Notifications, Insurance, Market, QR Pay, Tickets, and Parcel are genuinely unreachable",
+   "steps": "1. Look through the app and side menu for any of these.\n2. Try every reasonable path.",
+   "expected": "Confirmed in the code: none of these have a working link anywhere. Subscriptions, Send, and Events ARE real and reachable (via Cards and Help) \u2014 if you're testing those, they should work normally; this row is just about the rest.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOR-18",
+   "module": "Visual consistency",
+   "scenario": "Compare how different screens look as you move around",
+   "steps": "1. Visit Home, Travel, Wallet, and Bookmarks in turn.\n2. Compare the icons, buttons, and overall look.",
+   "expected": "Everything should feel like one consistent app \u2014 note anything that looks visually mismatched.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOR-19",
+   "module": "Dark mode",
+   "scenario": "Switch your phone's dark mode on and off",
+   "steps": "1. Turn your phone's system dark mode on.\n2. Reopen the app and browse a few screens.\n3. Turn dark mode back off.",
+   "expected": "This app is built to actually follow your phone's setting \u2014 check that text stays readable and nothing looks broken in either mode.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOR-20",
+   "module": "Merchant mode",
+   "scenario": "Use merchant features (if you have a merchant account)",
+   "steps": "1. Open Merchant mode.\n2. Check the Dashboard, sales History, and Settings.",
+   "expected": "Each screen should open and show real data if you can reach it. Note: confirmed in the code that nothing in the normal app links to Merchant mode \u2014 you likely won't find a way in, which is expected.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOR-21",
+   "module": "Cross-app \u2014 the main pairing, not yet tested jointly",
+   "scenario": "Book a ride on GoRide/Tap n Go and confirm it on GoDriver",
+   "steps": "1. On GoRide or Tap n Go, book an on-demand ride as a rider.\n2. On a GoDriver device, accept and run that exact trip.\n3. Check the rider's name, pickup/destination, and fare all match on both sides.",
+   "expected": "Everything matches correctly on both apps. (This is the main everyday pairing between these apps and hasn't had a dedicated joint check before now \u2014 the Moveet pairing already had a confirmed bug, this one hasn't been checked at all.)",
+   "priority": "High"
+  }
+ ],
+ "godriver": [
+  {
+   "id": "GOD-01",
+   "module": "Login",
+   "scenario": "Log in as a driver",
+   "steps": "1. Open the app.\n2. Enter your driver phone number and password.",
+   "expected": "You are logged in and land on the driver Home screen.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-02",
+   "module": "App launch",
+   "scenario": "Open the app fresh (cold start)",
+   "steps": "1. Fully close the app.\n2. Reopen it.",
+   "expected": "The app opens normally without crashing. Try this a few times across a day.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-03",
+   "module": "Core driving",
+   "scenario": "Go online, then offline, then online again",
+   "steps": "1. From Home, toggle online.\n2. Wait a minute, toggle offline.\n3. Toggle online again.",
+   "expected": "Each toggle works correctly and you start/stop receiving requests as expected \u2014 no stuck state.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-04",
+   "module": "Core driving \u2014 edge case",
+   "scenario": "Switch between trip modes (online, metered, Pool) in one session",
+   "steps": "1. Go online normally.\n2. Start and end a metered trip.\n3. Start and end a Pool shift.\n4. Go back to normal online mode.",
+   "expected": "Each switch works cleanly. Nothing gets stuck 'ending' or stays in the wrong mode after switching. This has broken repeatedly before \u2014 test it thoroughly.",
+   "priority": "Critical"
+  },
+  {
+   "id": "GOD-05",
+   "module": "Core driving",
+   "scenario": "Accept and haggle a trip request",
+   "steps": "1. Wait for an incoming request.\n2. Accept it, or send a counter-fare.",
+   "expected": "The trip starts correctly once accepted.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-06",
+   "module": "Metered trips",
+   "scenario": "Run a full metered trip, including an Extra charge",
+   "steps": "1. Start a metered fare.\n2. Add an 'Extra' charge mid-trip if the option exists.\n3. End the trip.",
+   "expected": "The fare and any Extra charge calculate correctly. The display doesn't show stuck/frozen numbers from a previous trip.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-07",
+   "module": "Passenger Display",
+   "scenario": "Pair and use a Passenger Display tablet",
+   "steps": "1. In Settings, enable Passenger Display pairing on a second device.\n2. Run a trip and check the tablet shows the live fare.",
+   "expected": "The tablet pairs and shows the correct live fare, not a stale one from a previous trip.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-08",
+   "module": "Wallet",
+   "scenario": "Top up, withdraw, and send cash",
+   "steps": "1. Open Wallet.\n2. Try Top Up, Withdraw, and Send Cash.",
+   "expected": "Each action completes correctly with the right balance shown afterward.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-09",
+   "module": "Account",
+   "scenario": "Reset your passcode via Forgot Passcode",
+   "steps": "1. From the login screen, use Forgot Passcode.\n2. Wait for the OTP prompt.",
+   "expected": "The OTP keyboard appears so you can actually enter the code.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-10",
+   "module": "Vehicle settings",
+   "scenario": "Check your vehicle's registered type",
+   "steps": "1. Open Settings > Vehicles.\n2. Check the vehicle type shown (e.g. taxi, trotro, private).",
+   "expected": "The type shown matches what was actually registered \u2014 not silently defaulted to the wrong type.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-11",
+   "module": "Cross-app",
+   "scenario": "Run a ride that was booked from the Moveet app",
+   "steps": "1. Have someone book a ride via Moveet that gets assigned to you.\n2. Accept and run that trip as normal.",
+   "expected": "The commuter's name and the fare both display correctly \u2014 this integration has broken on both sides before.",
+   "priority": "High"
+  },
+  {
+   "id": "GOD-12",
+   "module": "Sign out",
+   "scenario": "Sign out while a trip might be active",
+   "steps": "1. If possible, try signing out immediately after ending or during a trip.",
+   "expected": "Signing out never deletes or loses an active/just-completed trip's data.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOD-13",
+   "module": "Loading service",
+   "scenario": "Create and edit a loading-taxi/trotro service",
+   "steps": "1. Create a loading service run.\n2. Edit it.",
+   "expected": "Both actions work and the service details save correctly.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOD-14",
+   "module": "Settings",
+   "scenario": "Walk through your driver Settings end to end",
+   "steps": "1. Open Settings.\n2. Visit Vehicles, your profile/licence details, Sales, and Shift Details in turn.\n3. Try editing something small in one of them.",
+   "expected": "Every section opens and shows your real information; the edit saves correctly.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOD-15",
+   "module": "Signup",
+   "scenario": "Go through new-driver signup as if you were brand new (use a test account if possible)",
+   "steps": "1. Start the signup flow from scratch.\n2. Go through the document/ID verification steps.",
+   "expected": "Each step works and clearly explains what's needed \u2014 note anything confusing or stuck.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOD-16",
+   "module": "Misc",
+   "scenario": "Check Bonus (reachable) and Ratings/Contributions (confirm they're genuinely unreachable)",
+   "steps": "1. Open Settings and look for Bonus \u2014 it should be in the list.\n2. Also try to find Ratings and Contributions anywhere in the app.",
+   "expected": "Bonus should open and show real data. Ratings and Contributions are confirmed in the code to have no link anywhere \u2014 you should not find a way to them; note if you unexpectedly do.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOD-17",
+   "module": "Core driving",
+   "scenario": "Check the main driving screen while something is loading",
+   "steps": "1. On the main Home/driving screen, do something that needs the network on a slower connection if possible.",
+   "expected": "You should see some sign the app is working (a spinner or similar), not a frozen-looking screen \u2014 this screen is very large and worth watching closely.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOD-18",
+   "module": "Accessibility",
+   "scenario": "Check icon-only buttons are easy to understand",
+   "steps": "1. Look for buttons that are just an icon with no text (common on the driving screen).\n2. If possible, try your phone's larger-text setting on a couple of screens.",
+   "expected": "You should be able to tell what each icon-only button does without guessing.",
+   "priority": "Low"
+  },
+  {
+   "id": "GOD-19",
+   "module": "Dark mode",
+   "scenario": "Switch your phone's dark mode on and off",
+   "steps": "1. Turn your phone's system dark mode on.\n2. Reopen the app and browse a few screens.\n3. Turn it back off.",
+   "expected": "This app is built to actually follow your phone's setting \u2014 check that text stays readable and nothing looks broken in either mode.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOD-20",
+   "module": "Verification",
+   "scenario": "Use the camera/QR features (confirmed reachable in several places)",
+   "steps": "1. On Home, try the QR scan option.\n2. In Settings > Vehicles > Add Vehicle, try adding a vehicle photo.\n3. In Settings > your profile > Licence Details, try adding a licence photo.",
+   "expected": "Each of these opens the camera/QR scanner correctly and the captured photo/code is used as expected.",
+   "priority": "Medium"
+  },
+  {
+   "id": "GOD-21",
+   "module": "Cross-app \u2014 the main pairing, not yet tested jointly",
+   "scenario": "Book a ride on GoRide/Tap n Go and confirm it on GoDriver",
+   "steps": "1. On GoRide or Tap n Go, book an on-demand ride as a rider.\n2. On a GoDriver device, accept and run that exact trip.\n3. Check the rider's name, pickup/destination, and fare all match on both sides.",
+   "expected": "Everything matches correctly on both apps. (This is the main everyday pairing between these apps and hasn't had a dedicated joint check before now \u2014 the Moveet pairing already had a confirmed bug, this one hasn't been checked at all.)",
+   "priority": "High"
+  }
+ ],
+ "tapngo": [
+  {
+   "id": "TNG-01",
+   "module": "Login",
+   "scenario": "Log in by phone OTP",
+   "steps": "1. Open the app.\n2. Enter your phone number.\n3. Enter the OTP code you receive by SMS.",
+   "expected": "You are logged in and land on the Home dashboard.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-02",
+   "module": "Wallet",
+   "scenario": "Top up your Tap n Go card",
+   "steps": "1. From Home, top up the card balance.",
+   "expected": "The card balance updates correctly.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-03",
+   "module": "Bus booking",
+   "scenario": "Book a bus trip, including STC if offered",
+   "steps": "1. From Home, search for and book a trip.",
+   "expected": "Booking completes correctly.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-04",
+   "module": "Parcel Pickup",
+   "scenario": "Book a parcel pickup end-to-end",
+   "steps": "1. Open Parcel Tracking > Send a Parcel.\n2. Go through: destination, pickup address, recipient details, parcel info, photos (optional), value & insurance, availability.\n3. Review and confirm the booking.",
+   "expected": "A booking reference is issued and the booking appears in 'My Pickups'.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-05",
+   "module": "Parcel Pickup",
+   "scenario": "Track a pickup you booked",
+   "steps": "1. Open Parcel Tracking > My Pickups.\n2. Select your booking.",
+   "expected": "A live status timeline is shown, including a confirmed pickup time once scheduled.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-06",
+   "module": "Parcel Pickup",
+   "scenario": "Track a parcel by reference number",
+   "steps": "1. Open Parcel Tracking > Track a parcel.\n2. Enter or scan a tracking/booking reference.",
+   "expected": "The current status is shown.",
+   "priority": "Medium"
+  },
+  {
+   "id": "TNG-07",
+   "module": "Parcel Pickup \u2014 edge case",
+   "scenario": "Lose your connection while on My Pickups or a Pickup Detail screen",
+   "steps": "1. Open My Pickups or a pickup's detail screen.\n2. Turn on airplane mode or lose signal briefly.\n3. Try to reload.",
+   "expected": "You should see a clear 'couldn't load, try again' message with a retry button \u2014 not a blank error or stuck spinner.",
+   "priority": "Medium"
+  },
+  {
+   "id": "TNG-08",
+   "module": "Cards",
+   "scenario": "Manage cards: cash out, merge, view statements",
+   "steps": "1. Open the Cards section.\n2. Try cashing out to bank, merging two cards, and viewing a statement.",
+   "expected": "Each action completes and the numbers shown are correct.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-09",
+   "module": "Transactions",
+   "scenario": "View your transaction history",
+   "steps": "1. Open Drawer > Transactions.",
+   "expected": "Transactions load with a visible loading indicator, and an empty or error state is shown clearly if there's nothing to show or something goes wrong \u2014 not a blank screen.",
+   "priority": "Medium"
+  },
+  {
+   "id": "TNG-10",
+   "module": "Ride-hailing",
+   "scenario": "Book and haggle an on-demand ride from within Tap n Go",
+   "steps": "1. Find the ride-hailing option.\n2. Book a ride and try haggling a fare.",
+   "expected": "The map, route, and haggle flow all work without crashing.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-11",
+   "module": "Identity verification",
+   "scenario": "Complete a face/selfie verification step",
+   "steps": "1. If prompted for a selfie/face capture, complete it.",
+   "expected": "The photo preview shows the right way round (not mirrored) and the verification completes.",
+   "priority": "Medium-High"
+  },
+  {
+   "id": "TNG-12",
+   "module": "Display",
+   "scenario": "Switch your phone's dark mode on and off",
+   "steps": "1. Turn your phone's system dark mode on.\n2. Reopen the app.\n3. Turn it back off.",
+   "expected": "Note what the app actually does \u2014 it may stay light regardless of your phone's setting. Describe exactly what you see either way.",
+   "priority": "Low"
+  },
+  {
+   "id": "TNG-13",
+   "module": "Bookmarks / Promotions / My Trips",
+   "scenario": "Use the remaining drawer items",
+   "steps": "1. Open Drawer > My Trips, Promotions, and Bookmarks in turn.",
+   "expected": "Each screen loads with real, correct data.",
+   "priority": "Medium"
+  },
+  {
+   "id": "TNG-14",
+   "module": "Older features",
+   "scenario": "Test Insurance, Subscriptions, Events, BRT, Auctions, Hotels, and Trains \u2014 these are real, live features here",
+   "steps": "1. From the Home dashboard, find and open each of: Insurance, Subscriptions, Events, BRT, Auctions, Hotels, Trains.\n2. Try the main action in each (e.g. browsing a list, viewing details).",
+   "expected": "Unlike in some of the sibling apps, these are all confirmed in the code to be real, reachable features here with working buttons on the Home dashboard \u2014 they should actually work, not just 'open and look empty.'",
+   "priority": "Medium"
+  },
+  {
+   "id": "TNG-15",
+   "module": "Visual consistency",
+   "scenario": "Compare how different screens look as you move around",
+   "steps": "1. Visit the Home dashboard, a booking screen, Parcel Pickup, and Cards in turn.\n2. Compare the icons, buttons, and overall look.",
+   "expected": "Everything should feel like one consistent app \u2014 note anything that looks visually mismatched, especially between the newer Parcel screens and older ones.",
+   "priority": "Low"
+  },
+  {
+   "id": "TNG-16",
+   "module": "Accessibility",
+   "scenario": "Check icon-only buttons are easy to understand",
+   "steps": "1. Look for buttons that are just an icon with no text label.\n2. If possible, try your phone's larger-text accessibility setting on a couple of screens.",
+   "expected": "You should be able to tell what each icon-only button does without guessing.",
+   "priority": "Low"
+  },
+  {
+   "id": "TNG-17",
+   "module": "Home dashboard",
+   "scenario": "Check the Home dashboard while something is loading",
+   "steps": "1. On the Home dashboard, do something that needs the network (pull to refresh, or open it on a slower connection).",
+   "expected": "You should see some sign the app is working (a spinner or similar) \u2014 this screen is very large and has no loading indicator today, so watch closely for a blank/frozen look.",
+   "priority": "High"
+  },
+  {
+   "id": "TNG-18",
+   "module": "Older features",
+   "scenario": "Confirm Market, Merchant, QR Pay, and Tickets are genuinely unreachable",
+   "steps": "1. Look through the app and side menu for any of these.\n2. Try every reasonable path.",
+   "expected": "Confirmed in the code: none of these have a working link anywhere. (Send and Top-up/Deposit ARE real and reachable from Home/Cards \u2014 this row is just about the rest.)",
+   "priority": "Low"
+  }
+ ],
+ "moveet": [
+  {
+   "id": "MOV-01",
+   "module": "Login",
+   "scenario": "Log in or sign up by phone OTP",
+   "steps": "1. Open the app.\n2. Enter your phone number.\n3. Enter the OTP code you receive by SMS.",
+   "expected": "You are logged in and land on the Home hub.",
+   "priority": "High"
+  },
+  {
+   "id": "MOV-02",
+   "module": "Send a parcel",
+   "scenario": "Send a single parcel",
+   "steps": "1. Home > Send a Parcel.\n2. Pin the pickup location.\n3. Pick a route/destination.\n4. Fill in the parcel details.\n5. Create the order.",
+   "expected": "The order is created and a rider gets assigned.",
+   "priority": "High"
+  },
+  {
+   "id": "MOV-03",
+   "module": "Bulk send",
+   "scenario": "Send several parcels at once",
+   "steps": "1. Home > Bulk Send.\n2. Add 2-3 parcels in one session.",
+   "expected": "All parcels are created as separate orders correctly.",
+   "priority": "Medium"
+  },
+  {
+   "id": "MOV-04",
+   "module": "Order tracking",
+   "scenario": "Track an order after it's created",
+   "steps": "1. From Home or recent orders, select an active order.",
+   "expected": "The live status and rider location are shown correctly.",
+   "priority": "High"
+  },
+  {
+   "id": "MOV-05",
+   "module": "Rides",
+   "scenario": "Book a ride onto the GoDriver fleet",
+   "steps": "1. Home > Book a Ride.\n2. Pick a route.\n3. Review the fare preview and confirm.",
+   "expected": "You are matched with a GoDriver driver, and the fare and driver's view of your name display correctly on their end too (ask the driver if possible).",
+   "priority": "High"
+  },
+  {
+   "id": "MOV-06",
+   "module": "App stability",
+   "scenario": "Use saved addresses and open a bottom-sheet panel repeatedly",
+   "steps": "1. Open a screen with a sliding bottom sheet (e.g. saved addresses during Send a Parcel).\n2. Scroll the chip row inside it.\n3. Open and close the sheet a few times.",
+   "expected": "The sheet doesn't fight your scrolling, jump between sizes unexpectedly, or glitch.",
+   "priority": "High"
+  },
+  {
+   "id": "MOV-07",
+   "module": "App launch",
+   "scenario": "Open the app on Android on a cold start",
+   "steps": "1. Fully close the app.\n2. Reopen it.",
+   "expected": "No grey flash, and all text fields are visible (not invisible/blank) right after opening.",
+   "priority": "Medium-High"
+  },
+  {
+   "id": "MOV-08",
+   "module": "Rider \u2014 go online",
+   "scenario": "As a rider, go online and receive an order",
+   "steps": "1. On Rider Home, toggle online.\n2. Wait for an order.",
+   "expected": "You start receiving delivery orders, and after closing/reopening the app your online status is still correct (not silently reset).",
+   "priority": "High"
+  },
+  {
+   "id": "MOV-09",
+   "module": "Rider \u2014 deliver",
+   "scenario": "As a rider, accept and deliver an order, or cancel one",
+   "steps": "1. Accept an incoming order.\n2. Mark picked up / en route / arrived, then complete delivery.\n3. On a separate order, try 'Cancel Order' instead.",
+   "expected": "Delivery completes correctly. The cancel option (recently renamed from 'Forfeit') returns the order for reassignment with a clear confirmation.",
+   "priority": "High"
+  },
+  {
+   "id": "MOV-10",
+   "module": "Order details",
+   "scenario": "Check phone/navigation details and delivery area on an order card",
+   "steps": "1. Open an order's detail screen.\n2. Check the recipient's phone number, navigation/call buttons, and delivery area shown.",
+   "expected": "All details are correct and the call/navigate buttons work.",
+   "priority": "Medium"
+  },
+  {
+   "id": "MOV-11",
+   "module": "Become a rider",
+   "scenario": "Go through the become-a-rider signup",
+   "steps": "1. Home > Become a Rider.\n2. Complete the signup flow.",
+   "expected": "The application submits successfully.",
+   "priority": "Low"
+  },
+  {
+   "id": "MOV-12",
+   "module": "Rider \u2014 trotro",
+   "scenario": "Use the rider trotro mapping feature (confirmed reachable from Rider Home)",
+   "steps": "1. On Rider Home, find the trotro-mapping option.\n2. Map a station (place), then a route.",
+   "expected": "Both steps work and save your input correctly.",
+   "priority": "Medium"
+  },
+  {
+   "id": "MOV-13",
+   "module": "Rider \u2014 collect/deposit/offers",
+   "scenario": "Use Scan to Collect, Cash Deposit, and Instant Offer (all confirmed reachable from Rider Home)",
+   "steps": "1. On Rider Home, find and open Scan to Collect.\n2. Find and open Cash Deposit (under Wallet).\n3. Trigger an Instant Offer if one appears.",
+   "expected": "Each screen opens and its main action works as described.",
+   "priority": "Medium"
+  },
+  {
+   "id": "MOV-14",
+   "module": "App stability",
+   "scenario": "Check the customer Home screen while something is loading",
+   "steps": "1. On the customer Home screen, do something that needs the network on a slower connection if possible.",
+   "expected": "You should see some sign the app is working (a spinner or similar), not a blank-looking screen while it loads.",
+   "priority": "Medium"
+  },
+  {
+   "id": "MOV-15",
+   "module": "Visual consistency",
+   "scenario": "Compare how different screens look as you move around",
+   "steps": "1. Visit Home, Send a Parcel, an order's detail screen, and the rider side in turn.\n2. Compare the overall look.",
+   "expected": "Everything should feel like one consistent app \u2014 note anything that looks visually mismatched.",
+   "priority": "Low"
+  },
+  {
+   "id": "MOV-16",
+   "module": "Accessibility",
+   "scenario": "Check icon-only buttons are easy to understand",
+   "steps": "1. Look for buttons that are just an icon with no text.\n2. If possible, try your phone's larger-text setting on a couple of screens.",
+   "expected": "You should be able to tell what each icon-only button does without guessing.",
+   "priority": "Low"
+  },
+  {
+   "id": "MOV-17",
+   "module": "Dark mode",
+   "scenario": "Switch your phone's dark mode on and off",
+   "steps": "1. Turn your phone's system dark mode on.\n2. Reopen the app.\n3. Turn it back off.",
+   "expected": "Note exactly what the app does \u2014 it likely stays the same regardless of your phone's setting. Describe what you see either way.",
+   "priority": "Low"
+  }
+ ]
+}
