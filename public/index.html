@@ -3,201 +3,526 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" id="themeColor" content="#ffffff">
 <title>UAT Tracker</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script>
+  // Apply the saved theme before first paint so there's no flash.
+  (function(){ try { var t = localStorage.getItem("uat_theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch(e){} })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap">
 <style>
+  /* ================= design tokens (light default) ================= */
   :root{
-    --bg:#f5f3ee; --surface:#ffffff; --surface-2:#faf8f3; --border:#e2ddd0;
+    --bg:#ffffff; --surface:#ffffff; --surface-2:#f9fafb; --border:#e5e7eb;
     --fg:#20231f; --fg-muted:#6b6a5f; --accent:#1f6f4a; --accent-fg:#ffffff;
     --pass:#1f6f4a; --pass-bg:#e4f1e9; --fail:#b3261e; --fail-bg:#fbe8e7;
-    --blocked:#9a6a00; --blocked-bg:#fbf0d9; --na:#6b6a5f; --na-bg:#eceae1;
-    --notrun-bg:#eceae1;
-    --font-display:'IBM Plex Sans',system-ui,sans-serif;
-    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+    --blocked:#9a6a00; --blocked-bg:#fbf0d9; --na:#6b6a5f; --na-bg:#f3f4f6;
+    --notrun-bg:#f3f4f6;
+    --shadow:0 1px 2px rgba(32,35,31,.04), 0 8px 24px rgba(32,35,31,.08);
+    --shadow-sm:0 1px 2px rgba(32,35,31,.08);
+    --overlay:rgba(32,35,31,.45);
+    --font-display:'Plus Jakarta Sans',system-ui,sans-serif;
+    /* Labels, IDs and numbers also use Jakarta; tabular figures keep columns aligned. */
+    --font-mono:'Plus Jakarta Sans',system-ui,sans-serif;
+    --font-code:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sidebar-w:268px;
+    color-scheme:light;
   }
   @media (prefers-color-scheme: dark){
-    :root{
+    :root:not([data-theme="light"]){
       --bg:#000000; --surface:#121212; --surface-2:#1a1a1a; --border:#2a2a2a;
       --fg:#f0f0f0; --fg-muted:#9a9a9a; --accent:#5fcf9a; --accent-fg:#06160f;
       --pass:#5fcf9a; --pass-bg:#0f2a1c; --fail:#ff6b61; --fail-bg:#2a1210;
       --blocked:#e8b84b; --blocked-bg:#2a2008; --na:#9a9a9a; --na-bg:#1f1f1f;
-      --notrun-bg:#1f1f1f; color-scheme:dark;
+      --notrun-bg:#1f1f1f;
+      --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.6);
+      --shadow-sm:0 1px 2px rgba(0,0,0,.6);
+      --overlay:rgba(0,0,0,.7);
+      color-scheme:dark;
     }
   }
+  :root[data-theme="dark"]{
+    --bg:#000000; --surface:#121212; --surface-2:#1a1a1a; --border:#2a2a2a;
+    --fg:#f0f0f0; --fg-muted:#9a9a9a; --accent:#5fcf9a; --accent-fg:#06160f;
+    --pass:#5fcf9a; --pass-bg:#0f2a1c; --fail:#ff6b61; --fail-bg:#2a1210;
+    --blocked:#e8b84b; --blocked-bg:#2a2008; --na:#9a9a9a; --na-bg:#1f1f1f;
+    --notrun-bg:#1f1f1f;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.6);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.6);
+    --overlay:rgba(0,0,0,.7);
+    color-scheme:dark;
+  }
+
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
-  body{background:var(--bg);color:var(--fg);font-family:var(--font-display);line-height:1.45}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-display);line-height:1.45;-webkit-font-smoothing:antialiased}
+  [hidden]{display:none !important}
+  button{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .gutter{padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px))}
+  @media (min-width:1024px){ .gutter{padding-left:28px;padding-right:28px} }
+  .wrap{max-width:1320px;margin:0 auto}
+  .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  body{font-feature-settings:"tnum" 0}
+  .progress-label,.kpi .val,.plat-pct,.sb-proj .meta,.case-id,.filter-chip .count{font-variant-numeric:tabular-nums}
+  .muted{color:var(--fg-muted)}
+  .ico{width:16px;height:16px;flex:0 0 auto;display:block}
 
-  header{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--border)}
-  .header-inner{padding-block:14px 10px}
-  .header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-  h1{font-size:17px;font-weight:700;margin:0 0 2px;letter-spacing:-.01em}
-  .subtitle{font-size:12.5px;color:var(--fg-muted);margin:0 0 12px}
-  .role-badge{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--fg-muted);border:1px solid var(--border);white-space:nowrap}
-  .role-badge.admin{color:var(--accent);border-color:var(--accent)}
-  .header-actions{display:flex;gap:6px;align-items:center}
-  .icon-btn{font-family:var(--font-mono);font-size:11px;font-weight:600;padding:5px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+  /* ================= buttons ================= */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font-mono);font-size:12px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);cursor:pointer;white-space:nowrap;text-decoration:none}
+  .btn:hover{border-color:var(--fg-muted)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.danger{background:var(--fail);border-color:var(--fail);color:#fff}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--fg-muted)}
+  .btn.ghost:hover{color:var(--fg);border-color:var(--border)}
+  .btn.block{width:100%;padding:11px;font-size:13px}
+  .btn.sm{font-size:11px;padding:5px 9px;border-radius:7px}
+  .btn:disabled{opacity:.55;cursor:not-allowed;filter:none}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer;white-space:nowrap}
   .icon-btn:hover{color:var(--fg)}
+  .link-btn{background:none;border:none;padding:0;color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .spinner{width:12px;height:12px;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;display:inline-block;animation:spin .7s linear infinite;flex:0 0 auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  kbd{font-family:var(--font-code);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;border:1px solid var(--border);border-bottom-width:2px;background:var(--surface);color:var(--fg-muted)}
+  .seg{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border)}
+  .seg button{font-family:var(--font-mono);font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:none;background:none;color:var(--fg-muted);cursor:pointer;white-space:nowrap}
+  .seg button:hover{color:var(--fg)}
+  .seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow-sm)}
 
-  .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;flex-wrap:wrap}
-  .tabs::-webkit-scrollbar{display:none}
-  .tab{flex:0 0 auto;font-family:var(--font-mono);font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
-  .tab[aria-selected="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
-  .tab-divider{width:1px;align-self:stretch;background:var(--border);margin:0 2px}
+  /* ================= shell: sidebar ================= */
+  .sidebar{position:fixed;top:0;bottom:0;left:0;width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:40;overflow-y:auto;overscroll-behavior:contain;padding:16px 12px max(14px, env(safe-area-inset-bottom,0px))}
+  .content{margin-left:var(--sidebar-w);min-width:0;min-height:100vh}
+  .sb-scrim{display:none}
+  @media (max-width:1023px){
+    .sidebar{transform:translateX(-100%);transition:transform .2s ease;box-shadow:none;width:min(300px, 86vw)}
+    body.sb-open .sidebar{transform:none;box-shadow:var(--shadow)}
+    body.sb-open .sb-scrim{display:block;position:fixed;inset:0;background:var(--overlay);z-index:35}
+    body.sb-open{overflow:hidden}
+    .content{margin-left:0}
+  }
+  .sb-brand{display:flex;align-items:center;gap:10px;padding:2px 6px 14px}
+  .brand-mark{width:34px;height:34px;border-radius:10px;background:var(--accent);color:var(--accent-fg);font-family:var(--font-mono);font-weight:600;font-size:11px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .sb-title{font-weight:700;font-size:14.5px;letter-spacing:-.01em}
+  .sb-sub{font-size:11.5px;color:var(--fg-muted)}
+  .sb-close{margin-left:auto}
+  @media (min-width:1024px){ .sb-close{display:none} }
+  .sb-label{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-muted);padding:16px 10px 6px;font-weight:600}
+  .sb-label .mono{text-transform:none;letter-spacing:0;font-weight:500}
+  .sb-nav{display:flex;flex-direction:column;gap:2px}
+  .sb-link{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:9px;border:1px solid transparent;background:none;cursor:pointer;text-align:left;font-size:13.5px;font-weight:500;color:var(--fg-muted)}
+  .sb-link:hover{background:var(--surface-2);color:var(--fg)}
+  .sb-link[aria-current="page"]{background:var(--surface-2);color:var(--fg);border-color:var(--border);font-weight:600}
+  .sb-link .count{margin-left:auto}
+  .sb-proj{display:block;width:100%;padding:9px 10px 10px;border-radius:10px;border:1px solid transparent;background:none;cursor:pointer;text-align:left}
+  .sb-proj:hover{background:var(--surface-2)}
+  .sb-proj[aria-current="page"]{background:var(--surface-2);border-color:var(--border);box-shadow:inset 3px 0 0 var(--accent)}
+  .sb-proj .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .sb-proj .name{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sb-proj .meta{display:flex;justify-content:space-between;gap:8px;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);margin-top:6px}
+  .sb-proj .progress-track{height:4px;margin-top:6px}
+  .sb-badge{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--fail-bg);color:var(--fail);white-space:nowrap}
+  .sb-badge.ok{background:var(--pass-bg);color:var(--pass)}
+  .sb-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+  .sb-foot .seg{display:grid;grid-template-columns:repeat(3,1fr)}
+  .sb-foot-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .sb-foot-row .icon-btn{flex:1}
+  .who{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;text-align:left}
+  .who:hover{border-color:var(--fg-muted)}
+  .who.missing{border-color:var(--blocked)}
+  .who .name{font-size:13px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .who .sub{font-size:11px;color:var(--fg-muted);display:block}
+  .who .txt{flex:1;min-width:0}
+  .avatar{width:28px;height:28px;border-radius:999px;background:var(--accent);color:var(--accent-fg);font-family:var(--font-mono);font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .avatar.sm{width:24px;height:24px;font-size:9.5px}
+  .avatar.alt{background:var(--surface-2);color:var(--fg-muted);border:1px solid var(--border)}
+  .role-badge{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--surface);color:var(--fg-muted);border:1px solid var(--border);white-space:nowrap}
+  .role-badge.admin{color:var(--accent);border-color:var(--accent)}
 
-  .progress-row{display:flex;align-items:center;gap:10px;margin-top:10px}
-  .progress-track{flex:1;min-width:0;height:6px;border-radius:999px;background:var(--border);overflow:hidden;display:flex}
-  .progress-track span{height:100%}
-  .progress-label{font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-  .conn{font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);margin-left:8px}
-  .conn.err{color:var(--fail)}
+  /* ================= shell: top bar ================= */
+  .topbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
+  .topbar-inner{display:flex;align-items:flex-start;gap:12px;padding-block:14px 12px}
+  .menu-btn{display:none;padding:7px}
+  @media (max-width:1023px){ .menu-btn{display:inline-flex} }
+  .tb-title{flex:1;min-width:0}
+  .crumbs{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--fg-muted);margin-bottom:1px}
+  .crumbs button{background:none;border:none;padding:0;color:var(--fg-muted);cursor:pointer;font-size:11.5px}
+  .crumbs button:hover{color:var(--fg);text-decoration:underline}
+  h1{font-size:18px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .subtitle{font-size:12.5px;color:var(--fg-muted);margin:2px 0 0}
+  .tb-right{display:flex;gap:8px;align-items:center;padding-top:2px}
+  @media (max-width:639px){
+    .topbar-inner{align-items:center;padding-block:10px}
+    .subtitle,.conn .txt{display:none}
+    h1{font-size:16px}
+  }
+  .conn{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);white-space:nowrap}
+  .conn .dot{width:7px;height:7px;border-radius:999px;background:var(--fg-muted)}
+  .conn.live .dot{background:var(--pass);box-shadow:0 0 0 3px var(--pass-bg)}
+  .conn.syncing .dot{background:var(--blocked)}
+  .conn.offline{color:var(--fail)} .conn.offline .dot{background:var(--fail);box-shadow:0 0 0 3px var(--fail-bg)}
 
-  .platform-row{display:flex;gap:6px;margin-top:10px}
+  .context-row{display:flex;align-items:center;gap:12px;padding-bottom:12px;flex-wrap:wrap}
+  .platform-row{display:flex;gap:6px}
   .platform-chip{font-family:var(--font-mono);font-size:11.5px;font-weight:600;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
   .platform-chip[aria-pressed="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
+  .progress-row{display:flex;align-items:center;gap:10px;flex:1;min-width:200px}
+  .progress-track{flex:1;min-width:0;height:6px;border-radius:999px;background:var(--border);overflow:hidden;display:flex}
+  .progress-track span{height:100%;transition:width .7s cubic-bezier(.2,.7,.2,1)}
+  .progress-label{font-family:var(--font-mono);font-size:11.5px;color:var(--fg-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .progress-label b{color:var(--fg);font-weight:600}
 
-  .filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-  .filter-chip{font-family:var(--font-mono);font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--fg-muted);cursor:pointer}
+  /* ================= main ================= */
+  main{padding-block:18px 64px}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .filter-row{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex:1 1 auto;min-width:0}
+  .filter-row::-webkit-scrollbar{display:none}
+  @media (min-width:640px){ .filter-row{flex-wrap:wrap} }
+  .filter-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--fg-muted);cursor:pointer}
+  .filter-chip:hover{color:var(--fg)}
   .filter-chip[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);border-color:var(--fg-muted)}
+  .filter-chip .count{font-variant-numeric:tabular-nums;opacity:.8}
+  .sdot{width:7px;height:7px;border-radius:999px;display:inline-block;flex:0 0 auto}
+  .sdot.pass{background:var(--pass)} .sdot.fail{background:var(--fail)} .sdot.blocked{background:var(--blocked)} .sdot.na{background:var(--na)} .sdot.notrun{background:transparent;border:1.5px solid var(--fg-muted)}
+  .search{position:relative;flex:0 1 260px;min-width:160px}
+  .search input{width:100%;padding:7px 30px 7px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--fg);font-family:var(--font-display);font-size:13px}
+  .search input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .search kbd{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none}
+  .search input:not(:placeholder-shown) + kbd{display:none}
+  @media (max-width:639px){ .search{flex:1 1 100%} .search kbd{display:none} }
 
-  main{max-width:720px;margin:0 auto;padding-block:16px 48px}
+  .banner{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .banner.done{background:var(--pass-bg);border-color:transparent}
+  .banner-text{font-size:13px;min-width:0;flex:1 1 260px}
+  .banner-text strong{display:block;font-size:14px}
+  .banner-text .muted{font-size:12.5px}
+  .banner-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+  .notes-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:16px;overflow:hidden}
+  .notes-toggle{display:flex;width:100%;align-items:center;gap:8px;padding:12px 14px;background:none;border:none;cursor:pointer;text-align:left}
+  .notes-title{font-size:13px;font-weight:600;margin:0;flex:1}
+  .notes-count{font-family:var(--font-mono);font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--fg-muted)}
+  .notes-body{padding:0 14px 14px}
+  .notes-form{display:flex;gap:8px;margin-bottom:10px;align-items:stretch}
+  .notes-form textarea{flex:1;min-height:42px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical}
+  .notes-form textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .note-row{padding:9px 0;border-top:1px solid var(--border);font-size:13px;white-space:pre-line}
+  .note-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);margin-bottom:2px;white-space:normal}
+
+  .module{margin-bottom:18px}
+  .module-head{display:flex;align-items:baseline;gap:10px;margin:0 2px 8px}
+  .module-head h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);margin:0}
+  .module-head .mono{font-size:10.5px;color:var(--fg-muted)}
   .case-grid{display:block}
-  @media (min-width:860px){
-    main{max-width:1200px}
-    .case-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:12px;align-items:start}
+  @media (min-width:760px){
+    .case-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-items:start}
     .case-grid .card{margin-bottom:0}
   }
-  @media (min-width:1300px){ main{max-width:1560px} }
 
-  .empty{padding:48px 0;text-align:center;color:var(--fg-muted)}
-  .empty strong{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
-
-  .tester-bar{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:14px}
-  .tester-bar input{flex:1;min-width:0;border:none;background:transparent;font-family:var(--font-display);font-size:13.5px;color:var(--fg)}
-  .tester-bar input:focus{outline:none}
-  .tester-bar .lbl{font-size:11.5px;color:var(--fg-muted);white-space:nowrap}
-
+  /* ================= case card ================= */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden}
-  .card-head{display:flex;gap:10px;align-items:flex-start;padding:13px 14px;cursor:pointer}
-  .case-id{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--fg-muted);flex:0 0 auto;padding-top:2px}
-  .case-main{flex:1;min-width:0}
-  .case-scenario{font-size:14px;font-weight:600;margin:0 0 3px}
-  .case-module{font-size:11.5px;color:var(--fg-muted)}
+  .card.s-pass{box-shadow:inset 3px 0 0 var(--pass)}
+  .card.s-fail{box-shadow:inset 3px 0 0 var(--fail)}
+  .card.s-blocked{box-shadow:inset 3px 0 0 var(--blocked)}
+  .card.s-na{box-shadow:inset 3px 0 0 var(--na)}
+  .card.open{border-color:var(--accent)}
+  .card-head{display:flex;width:100%;gap:10px;align-items:flex-start;padding:13px 14px;cursor:pointer;background:none;border:none;text-align:left}
+  .card-head:hover{background:var(--surface-2)}
+  .case-id{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--fg-muted);flex:0 0 auto;padding-top:2px;min-width:56px}
+  .case-main{flex:1;min-width:0;display:block}
+  .case-scenario{display:block;font-size:14px;font-weight:600;margin:0 0 3px}
+  .case-module{display:block;font-size:11.5px;color:var(--fg-muted)}
   .case-right{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-  .pill{font-family:var(--font-mono);font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap}
   .pill.pass{color:var(--pass);background:var(--pass-bg)}
   .pill.fail{color:var(--fail);background:var(--fail-bg)}
   .pill.blocked{color:var(--blocked);background:var(--blocked-bg)}
   .pill.na, .pill.notrun{color:var(--na);background:var(--na-bg)}
-  .prio{font-size:10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.04em}
+  .prio{font-size:10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .prio.hi{color:var(--fail)}
+  .chev{flex:0 0 auto;color:var(--fg-muted);font-size:14px;line-height:1;padding-top:3px}
 
-  .card-body{padding:0 14px 14px;display:none}
-  .card.open .card-body{display:block}
-  .field-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);margin:10px 0 4px}
-  .steps, .expected{font-size:13px;white-space:pre-line;color:var(--fg)}
-  .expected{background:var(--surface-2);border-radius:8px;padding:8px 10px}
-
-  .result-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-  .result-btn{font-family:var(--font-mono);font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+  /* ================= case dialog ================= */
+  body.modal-open{overflow:hidden}
+  .case-overlay{z-index:55}
+  .case-overlay.still{animation:none}
+  .cm{width:100%;max-width:980px;max-height:calc(100dvh - 48px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .case-overlay:not(.still) .cm{animation:pop .16s ease-out}
+  @keyframes pop{from{transform:translateY(10px) scale(.99);opacity:0}}
+  .cm-head{display:flex;align-items:flex-start;gap:12px;padding:16px 18px 14px;border-bottom:1px solid var(--border)}
+  .cm-title{flex:1;min-width:0}
+  .cm-kicker{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--fg-muted)}
+  .cm-kicker .mono{font-weight:600}
+  .cm-kicker .prio{margin-left:4px}
+  .cm-head h3{font-size:17px;margin:4px 0 0;letter-spacing:-.01em}
+  .cm-head .pill{margin-top:2px}
+  .cm-close{font-size:14px;padding:4px 8px;margin:-2px -6px 0 0}
+  .cm-scroll{overflow-y:auto;overscroll-behavior:contain;flex:1;min-height:0}
+  .cm-body{padding:4px 18px 18px}
+  .cm-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface-2)}
+  @media (max-width:639px){
+    .case-overlay{padding:0;align-items:stretch}
+    .cm{max-width:none;max-height:none;height:100dvh;border-radius:0;border:none}
+    .cm-head{padding:max(14px, env(safe-area-inset-top,0px)) 16px 12px}
+    .cm-body{padding:4px 16px 16px}
+    .cm-foot{padding:10px 16px max(10px, env(safe-area-inset-bottom,0px))}
+    .foot-nav{width:100%} .foot-nav .btn{flex:1}
+  }
+  .body-cols{display:block}
+  @media (min-width:860px){ .body-cols{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px} }
+  .field-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);margin:14px 0 6px;display:flex;align-items:center;gap:8px}
+  .field-label .hint{text-transform:none;letter-spacing:0;font-size:11px}
+  .steps{margin:0;padding:0;list-style:none;counter-reset:step;font-size:13px}
+  .steps li{counter-increment:step;display:flex;gap:10px;padding:5px 0}
+  .steps li::before{content:counter(step);flex:0 0 20px;height:20px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--fg-muted);display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .steps.plain{white-space:pre-line}
+  .steps.plain li::before{display:none}
+  .expected{font-size:13px;white-space:pre-line;background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:0;border-left:3px solid var(--accent)}
+  .result-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .result-btn{display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font-mono);font-size:12px;font-weight:600;padding:9px 6px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+  .result-btn:hover{color:var(--fg);border-color:var(--fg-muted)}
+  .result-btn kbd{background:transparent}
+  @media (hover:none){ .result-btn kbd{display:none} }
   .result-btn[aria-pressed="true"].pass{background:var(--pass-bg);color:var(--pass);border-color:var(--pass)}
   .result-btn[aria-pressed="true"].fail{background:var(--fail-bg);color:var(--fail);border-color:var(--fail)}
   .result-btn[aria-pressed="true"].blocked{background:var(--blocked-bg);color:var(--blocked);border-color:var(--blocked)}
   .result-btn[aria-pressed="true"].na{background:var(--na-bg);color:var(--na);border-color:var(--na)}
-
-  .comment-box{width:100%;margin-top:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical;min-height:40px}
+  .result-btn[aria-pressed="true"] kbd{border-color:currentColor;color:inherit}
+  .result-meta{font-size:11.5px;color:var(--fg-muted);margin-top:8px;min-height:16px}
+  .nudge{font-size:12px;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--fail-bg);color:var(--fail)}
+  .nudge.blocked{background:var(--blocked-bg);color:var(--blocked)}
+  .comment-box{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical;min-height:72px;display:block}
   .comment-box:focus{outline:2px solid var(--accent);outline-offset:-1px}
-  .save-state{font-size:11px;color:var(--fg-muted);margin-top:6px;min-height:14px}
+  .comment-box.want{border-color:var(--fail)}
+  .save-state{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--fg-muted);margin-top:6px;min-height:16px}
   .save-state.saved{color:var(--pass)}
+  .save-state.error{color:var(--fail)}
+  .shot-row{display:flex;flex-wrap:wrap;gap:8px}
+  .shot-thumb{position:relative;width:72px;height:72px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border)}
+  .shot-thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in;border-radius:7px;display:block}
+  .shot-thumb .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--fg-muted)}
+  .shot-thumb .rm{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:999px;border:2px solid var(--surface);background:var(--fail);color:#fff;font-size:12px;line-height:16px;text-align:center;cursor:pointer;padding:0}
+  .shot-add{position:relative;width:72px;height:72px;border-radius:8px;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center}
+  .shot-add:hover,.shot-add:focus-within{border-color:var(--accent);color:var(--accent)}
+  .shot-add .plus{font-size:20px;line-height:1}
+  .shot-add input{position:absolute;width:1px;height:1px;opacity:0}
+  .shot-help{font-size:11px;color:var(--fg-muted);margin-top:6px}
+  .shortcut-hint{font-size:11px;color:var(--fg-muted);display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+  @media (hover:none){ .shortcut-hint{display:none} }
+  .foot-nav{display:flex;gap:6px;margin-left:auto}
 
-  .chev{flex:0 0 auto;color:var(--fg-muted);font-size:12px;padding-top:3px;transition:transform .15s}
-  .card.open .chev{transform:rotate(90deg)}
+  /* ================= states ================= */
+  .empty{padding:48px 16px;text-align:center;color:var(--fg-muted);font-size:13px}
+  .empty strong{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
+  .empty .btn{margin-top:14px}
+  .empty.error strong{color:var(--fail)}
+  .state-box{background:var(--surface);border:1px solid var(--border);border-radius:14px}
+  .skel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}
+  .skel i{display:block;height:10px;border-radius:6px;background:var(--surface-2);margin-bottom:8px;position:relative;overflow:hidden}
+  .skel i::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--border),transparent);animation:shimmer 1.2s infinite;opacity:.6}
+  @keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  @media (prefers-reduced-motion:reduce){ *{animation-duration:0s !important;transition:none !important} }
 
-  .shot-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-  .shot-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border)}
-  .shot-thumb img{width:100%;height:100%;object-fit:cover;cursor:pointer}
-  .shot-thumb button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:999px;border:none;background:var(--fail);color:#fff;font-size:11px;line-height:18px;text-align:center;cursor:pointer;padding:0}
-  .shot-add{width:64px;height:64px;border-radius:8px;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .shot-add input{display:none}
-  .shot-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;padding:24px}
-  .shot-lightbox img{max-width:100%;max-height:100%;border-radius:8px}
-
-  /* General notes (app-level, not tied to a case) */
-  .notes-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
-  .notes-title{font-size:13px;font-weight:600;margin:0 0 8px}
-  .notes-form{display:flex;gap:8px;margin-bottom:10px}
-  .notes-form textarea{flex:1;min-height:40px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical}
-  .notes-form button{font-family:var(--font-mono);font-size:12px;font-weight:600;padding:0 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer}
-  .note-row{padding:8px 0;border-top:1px solid var(--border);font-size:13px}
-  .note-row:first-child{border-top:none}
-  .note-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);margin-bottom:2px}
-
-  /* Login gate */
-  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .login-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px}
+  /* ================= login ================= */
+  .login-screen{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+  .login-card{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px}
+  .login-card .brand-mark{margin-bottom:16px}
   .login-card h2{font-size:17px;margin:0 0 4px}
   .login-card p{font-size:12.5px;color:var(--fg-muted);margin:0 0 18px}
-  .login-card input{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:14px;margin-bottom:10px}
-  .login-card input:focus{outline:2px solid var(--accent);outline-offset:-1px}
-  .login-card button{width:100%;padding:11px;border-radius:9px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);font-family:var(--font-mono);font-weight:600;font-size:13px;cursor:pointer}
-  .login-err{color:var(--fail);font-size:12.5px;margin-top:8px;min-height:16px}
+  .input-label{display:block;font-size:11.5px;font-weight:600;color:var(--fg-muted);margin-bottom:6px}
+  .text-input{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:14px}
+  .text-input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .text-input.invalid{border-color:var(--fail)}
+  .pw-wrap{position:relative;margin-bottom:12px}
+  .pw-wrap .text-input{padding-right:64px}
+  .pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%)}
+  .login-err{color:var(--fail);font-size:12.5px;margin-top:10px;min-height:18px}
+  .login-foot{font-size:11.5px;color:var(--fg-muted);margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
 
-  /* Summary table */
-  .summary-table{width:100%;border-collapse:collapse;font-size:13px}
-  .summary-table th,.summary-table td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border)}
-  .summary-table th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;color:var(--fg-muted);letter-spacing:.04em}
-  .summary-table td.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
-  .summary-bar{width:80px;height:6px;border-radius:999px;background:var(--border);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:8px}
-  .summary-bar span{display:block;height:100%;background:var(--accent)}
+  /* ================= modal / lightbox / toast ================= */
+  .overlay{position:fixed;inset:0;background:var(--overlay);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;animation:fade .12s ease-out}
+  @keyframes fade{from{opacity:0}}
+  .modal{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow)}
+  .modal h3{font-size:16px;margin:0 0 4px}
+  .modal .desc{font-size:12.5px;color:var(--fg-muted);margin:0 0 16px}
+  .modal .field{margin-bottom:12px}
+  .modal .field-err{color:var(--fail);font-size:12px;margin-top:5px}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .kb-list{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:13px;align-items:center}
+  .lightbox{flex-direction:column;gap:10px;background:rgba(0,0,0,.88);z-index:70}
+  .lightbox img{max-width:100%;max-height:calc(100% - 60px);border-radius:8px;cursor:zoom-out}
+  .lightbox .cap{color:#ddd;font-family:var(--font-mono);font-size:11px;display:flex;gap:12px;align-items:center}
+  .lightbox .close{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.12);color:#fff;border:none}
+  .toasts{position:fixed;left:50%;bottom:max(16px, env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:8px;align-items:center;width:calc(100% - 32px);max-width:420px;pointer-events:none}
+  .toast{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--fg);color:var(--surface);font-size:13px;padding:10px 14px;border-radius:10px;box-shadow:var(--shadow);animation:rise .18s ease-out;max-width:100%}
+  .toast.error{background:var(--fail);color:#fff}
+  .toast .link-btn{color:inherit}
+  @keyframes rise{from{transform:translateY(8px);opacity:0}}
 
-  .history-row{padding:10px 0;border-top:1px solid var(--border);font-size:13px}
+  /* ================= dashboard ================= */
+  .page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .page-head h2{font-size:20px;margin:0 0 2px;letter-spacing:-.015em}
+  .page-head p{font-size:13px;color:var(--fg-muted);margin:0}
+  .page-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:20px}
+  .kpis .kpi:first-child{grid-column:1 / -1}
+  @media (min-width:760px){ .kpis{grid-template-columns:1.6fr repeat(4,minmax(0,1fr))} .kpis .kpi:first-child{grid-column:auto} }
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+  .kpi .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);display:flex;align-items:center;gap:6px}
+  .kpi .val{font-family:var(--font-mono);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:4px;line-height:1.2}
+  .kpi .sub{font-size:11.5px;color:var(--fg-muted)}
+  .kpi .progress-track{margin:10px 0 6px;height:8px}
+  .kpi.fail .val{color:var(--fail)} .kpi.blocked .val{color:var(--blocked)} .kpi.pass .val{color:var(--pass)}
+  .dash-grid{display:grid;gap:20px;grid-template-columns:minmax(0,1fr)}
+  .dash-grid > *{min-width:0}
+  @media (min-width:1180px){ .dash-grid{grid-template-columns:minmax(0,1.65fr) minmax(320px,1fr);align-items:start} }
+  .section-title{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);margin:0 2px 10px}
+  .section-title .hint{text-transform:none;letter-spacing:0;font-weight:500}
+  @media (max-width:639px){ .section-title .hint{display:none} }
+  .app-grid{display:grid;gap:12px}
+  @media (min-width:760px){ .app-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))} }
+  .app-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .app-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .app-card-head h3{font-size:14.5px;margin:0}
+  .app-card-head .sub{font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted)}
+  .plat-row{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;width:100%;padding:12px 14px;background:none;border:none;border-top:1px solid var(--border);cursor:pointer;text-align:left}
+  .app-card-head + .plat-row{border-top:none}
+  .plat-row:hover{background:var(--surface-2)}
+  .plat-name{font-family:var(--font-mono);font-size:12px;font-weight:600}
+  .plat-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted)}
+  .plat-stats span{display:inline-flex;align-items:center;gap:4px}
+  .plat-pct{font-family:var(--font-mono);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+  .plat-pct small{display:block;font-size:10.5px;color:var(--fg-muted);font-weight:500}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .panel-head h3{font-size:13.5px;margin:0}
+  .panel-empty{padding:22px 14px;font-size:12.5px;color:var(--fg-muted);text-align:center}
+  .feed-item{display:flex;gap:10px;align-items:flex-start;width:100%;padding:10px 14px;border:none;border-top:1px solid var(--border);background:none;text-align:left;cursor:pointer;font-size:13px}
+  .feed-item:first-child{border-top:none}
+  .feed-item:hover{background:var(--surface-2)}
+  .feed-item .body{flex:1;min-width:0}
+  .feed-item .title{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .feed-item .meta{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-muted);margin-top:2px}
+  .feed-item .note{display:block;font-size:12px;color:var(--fg-muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi-hero{display:flex;gap:18px;align-items:center}
+  .donut{width:104px;height:104px;transform:rotate(-90deg);flex:0 0 auto;display:block}
+  .donut circle{fill:none;stroke-width:11}
+  .donut-track{stroke:var(--border)}
+  .donut-seg{transition:stroke-dasharray .7s cubic-bezier(.2,.7,.2,1), stroke-dashoffset .7s cubic-bezier(.2,.7,.2,1)}
+  .hero-txt{min-width:0}
+  .hero-txt .sub + .sub{margin-top:2px}
+  .app-card-head .last{display:block;font-size:11px;color:var(--fg-muted);margin-top:2px}
+  .app-card-head .last b{color:var(--fg);font-weight:600}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow-x:auto}
+  .htable{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+  .htable th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);font-weight:600;padding:0;border-bottom:1px solid var(--border);white-space:nowrap}
+  .htable th button{all:unset;cursor:pointer;display:flex;align-items:center;gap:4px;padding:10px 12px;width:100%;box-sizing:border-box}
+  .htable th button:hover{color:var(--fg)}
+  .htable th button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .htable th[aria-sort] button{color:var(--fg)}
+  .htable td{padding:11px 12px;border-top:1px solid var(--border);vertical-align:middle}
+  .htable tbody tr:first-child td{border-top:none}
+  .htable tbody tr{cursor:pointer}
+  .htable tbody tr:hover td{background:var(--surface-2)}
+  .htable .num{font-variant-numeric:tabular-nums;font-weight:600}
+  .htable .num.fail{color:var(--fail)} .htable .num.blocked{color:var(--blocked)} .htable .num.zero{color:var(--fg-muted);font-weight:500}
+  .htable .proj{font-weight:600}
+  .cell-bar{display:flex;align-items:center;gap:8px;min-width:88px;background:none;border:none;padding:0;cursor:pointer;width:100%}
+  .cell-bar .progress-track{height:5px}
+  .cell-bar span.pct{font-variant-numeric:tabular-nums;font-weight:600;min-width:34px;text-align:right;font-size:12px}
+  .htable .muted-sm{font-size:11.5px;color:var(--fg-muted);white-space:nowrap}
+  .tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .tag.crit{background:var(--fail-bg);color:var(--fail)} .tag.high{background:var(--blocked-bg);color:var(--blocked)}
+  .pair{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .panel-more{display:block;padding:9px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--fg-muted);text-align:center}
+
+  /* ================= history ================= */
+  .select{padding:7px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--fg);font-family:var(--font-mono);font-size:12px}
+  .history-day{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);margin:18px 2px 6px}
+  .history-list{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .history-row{display:grid;grid-template-columns:52px 84px 1fr;gap:10px;padding:10px 14px;border-top:1px solid var(--border);font-size:13px;align-items:start}
   .history-row:first-child{border-top:none}
+  .history-row .time{font-family:var(--font-mono);font-size:11px;color:var(--fg-muted);padding-top:2px}
+  .history-row .what{min-width:0}
+  .history-row .comment{color:var(--fg-muted);font-size:12.5px;margin-top:2px;white-space:pre-line;overflow-wrap:anywhere}
+  @media (max-width:560px){ .history-row{grid-template-columns:44px 1fr} .history-row .pillcell,.history-row .what{grid-column:2} }
 </style>
 </head>
 <body>
 
 <div id="loginScreen" class="login-screen" hidden>
-  <div class="login-card">
+  <form class="login-card" id="loginForm" novalidate>
+    <div class="brand-mark" aria-hidden="true">UAT</div>
     <h2>UAT Tracker</h2>
-    <p>Enter the access passphrase to continue.</p>
-    <input type="password" id="loginPassword" placeholder="Passphrase" autocomplete="current-password">
-    <button id="loginBtn">Continue</button>
-    <div class="login-err" id="loginErr"></div>
-  </div>
+    <p>Sign in with the passphrase your test lead shared with you.</p>
+    <label class="input-label" for="loginPassword">Passphrase</label>
+    <div class="pw-wrap">
+      <input class="text-input" type="password" id="loginPassword" autocomplete="current-password" required>
+      <button type="button" class="btn ghost sm pw-toggle" id="pwToggle" aria-pressed="false">Show</button>
+    </div>
+    <button type="submit" class="btn primary block" id="loginBtn">Continue</button>
+    <div class="login-err" id="loginErr" role="alert"></div>
+    <div class="login-foot">Admins sign in with the admin passphrase to unlock History and passphrase settings.</div>
+  </form>
 </div>
 
 <div id="app" hidden>
-<header class="gutter">
-  <div class="header-inner">
-    <div class="header-top">
-      <div>
-        <h1>UAT Tracker</h1>
-        <p class="subtitle">Walk through each case on the app, pick a result, add a note if anything's off.</p>
-      </div>
-      <div class="header-actions">
-        <span class="role-badge" id="roleBadge"></span>
-        <button class="icon-btn" id="adminSettingsBtn" hidden>Change passphrase</button>
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-brand">
+      <div><div class="sb-title">UAT Tracker</div><div class="sb-sub">Release acceptance testing</div></div>
+      <button class="icon-btn sb-close" id="sbClose" aria-label="Close navigation">✕</button>
+    </div>
+    <nav class="sb-nav" id="sbNav"></nav>
+    <div class="sb-label"><span>Projects</span><span class="mono" id="sbProjMeta"></span></div>
+    <nav class="sb-nav" id="sbProjects" aria-label="Projects"></nav>
+    <div class="sb-foot">
+      <button class="who" id="whoBtn"></button>
+      <div class="seg" id="themeSeg" role="group" aria-label="Theme"></div>
+      <div class="sb-foot-row">
+        <button class="icon-btn" id="adminSettingsBtn" hidden>Passphrase</button>
         <button class="icon-btn" id="logoutBtn">Log out</button>
       </div>
     </div>
-    <div class="tabs" id="tabs" role="tablist"></div>
-    <div class="platform-row" id="platformRow"></div>
-    <div class="progress-row" id="progressRow">
-      <div class="progress-track" id="progressTrack"></div>
-      <span class="progress-label" id="progressLabel">0 / 0</span>
-      <span class="conn" id="connState"></span>
-    </div>
-    <div class="filter-row" id="filterRow"></div>
-  </div>
-</header>
+  </aside>
+  <div class="sb-scrim" id="sbScrim"></div>
 
-<main class="gutter" id="main">
-  <div class="empty"><strong>Loading…</strong></div>
-</main>
+  <div class="content">
+    <header class="topbar" id="header">
+      <div class="gutter"><div class="wrap">
+        <div class="topbar-inner">
+          <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open navigation" aria-controls="sidebar"></button>
+          <div class="tb-title">
+            <div class="crumbs" id="crumbs"></div>
+            <h1 id="pageTitle"></h1>
+            <p class="subtitle" id="subtitle"></p>
+          </div>
+          <div class="tb-right"><span class="conn" id="connState" role="status"></span></div>
+        </div>
+        <div class="context-row" id="contextRow">
+          <div class="platform-row" id="platformRow" role="group" aria-label="Platform"></div>
+          <div class="progress-row">
+            <div class="progress-track" id="progressTrack" role="progressbar" aria-valuemin="0"></div>
+            <span class="progress-label" id="progressLabel"></span>
+          </div>
+        </div>
+      </div></div>
+    </header>
+    <main class="gutter"><div class="wrap" id="main"></div></main>
+  </div>
 </div>
+
+<div id="caseLayer"></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
 
 <script>
 (function(){
+  "use strict";
+
+  // ===================================================================
+  // config
+  // ===================================================================
   var APPS = [
     {id:"vip", label:"VIP"},
     {id:"goride", label:"GoRide"},
@@ -205,558 +530,1819 @@
     {id:"tapngo", label:"Tap n Go"},
     {id:"moveet", label:"Moveet"}
   ];
+  var PLATFORMS = [{id:"ios", label:"iOS"}, {id:"android", label:"Android"}];
   var RESULTS = [
-    {key:"Pass", cls:"pass"},
-    {key:"Fail", cls:"fail"},
-    {key:"Blocked", cls:"blocked"},
-    {key:"N/A", cls:"na"}
+    {key:"Pass", cls:"pass", kb:"p", title:"Works as expected"},
+    {key:"Fail", cls:"fail", kb:"f", title:"Doesn't match the expected result"},
+    {key:"Blocked", cls:"blocked", kb:"b", title:"Can't run this case right now"},
+    {key:"N/A", cls:"na", kb:"n", title:"Doesn't apply to this build"}
   ];
-  var FILTERS = ["All", "Pass", "Fail", "Blocked", "N/A", "Not run"];
-  var PILL_CLASS = {"Pass":"pass", "Fail":"fail", "Blocked":"blocked", "N/A":"na", "Not run":"notrun"};
+  var FILTERS = ["All", "Not run", "Fail", "Blocked", "Pass", "N/A"];   // what needs attention first
+  var CLS = {"Pass":"pass", "Fail":"fail", "Blocked":"blocked", "N/A":"na", "Not run":"notrun"};
   var POLL_MS = 5000;
+  var MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+  var THEMES = [{id:"system", label:"Auto"}, {id:"light", label:"Light"}, {id:"dark", label:"Dark"}];
 
-  var PLATFORMS = [
-    {id:"ios", label:"iOS"},
-    {id:"android", label:"Android"}
-  ];
+  // ===================================================================
+  // storage (always guarded — private windows can throw)
+  // ===================================================================
+  var store = {
+    get: function(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set: function(k, v){ try { localStorage.setItem(k, v); } catch(e){} },
+    del: function(k){ try { localStorage.removeItem(k); } catch(e){} },
+    json: function(k){ try { return JSON.parse(localStorage.getItem(k) || "null"); } catch(e){ return null; } }
+  };
+  function validApp(id){ return APPS.some(function(a){ return a.id === id; }) ? id : APPS[0].id; }
+  function validPlatform(id){ return id === "android" ? "android" : "ios"; }
 
-  var state = {
-    view: "cases",       // "cases" | "summary" | "history"
-    app: APPS[0].id,
-    platform: "ios",     // "ios" | "android" — same case list, independent outcomes per platform
+  // ===================================================================
+  // state
+  // ===================================================================
+  var S = {
+    auth: store.json("uat_auth"),
+    view: "dashboard",                   // "dashboard" | "cases" | "history"
+    app: validApp(store.get("uat_app")),
+    platform: validPlatform(store.get("uat_platform")),
+    theme: store.get("uat_theme") || "system",
     filter: "All",
-    cases: {},
-    results: {ios: {}, android: {}},       // results[platform][caseId]
-    attachments: {ios: {}, android: {}},   // attachments[platform][caseId]
-    comments: {},
-    tester: "", openCard: null, loaded: {}, resultsLoaded: {ios: {}, android: {}}, pollTimer: null,
-    auth: null           // {token, role}
+    query: "",
+    tester: store.get("uat_tester") || "",
+    openCard: null,
+    pendingOpen: null,                   // case to open once its app finishes loading
+    notesOpen: false,
+    sidebarOpen: false,
+    dashPlat: "",                        // dashboard scope: "" | "ios" | "android"
+    dashMode: store.get("uat_dash_mode") === "table" ? "table" : "cards",
+    dashSort: {key: null, dir: "desc"},  // table sort; null = project order
+    replaceUrl: false,
+    cases: {}, casesStatus: {},          // by app
+    results: {}, resultsStatus: {},      // by app|platform → {caseId: latest result doc}
+    overviewStatus: "idle", overviewAt: null,
+    attachments: {},                     // by app|platform → {caseId: [meta]}
+    comments: {}, commentsStatus: {},    // by app
+    saves: {},                           // by app|platform|caseId → {state, pending, inflight}
+    uploads: {},                         // by app|platform|caseId → count in flight
+    imgCache: {},
+    loadError: {},
+    conn: "syncing",
+    pollTimer: null, tick: 0,
+    history: null, historyStatus: "idle", historyFilter: {app: "", platform: "", q: ""},
+    dirty: false                         // data changed while the user was typing
   };
 
-  try { state.tester = localStorage.getItem("uat_tester") || ""; } catch(e){}
-  try { state.platform = localStorage.getItem("uat_platform") || "ios"; } catch(e){}
-  try {
-    var saved = localStorage.getItem("uat_auth");
-    if (saved) state.auth = JSON.parse(saved);
-  } catch(e){}
+  function rk(app, platform){ return app + "|" + platform; }
+  function curKey(){ return rk(S.app, S.platform); }
+  function appLabel(id){ for (var i = 0; i < APPS.length; i++) if (APPS[i].id === id) return APPS[i].label; return id; }
+  function platLabel(id){ return id === "android" ? "Android" : id === "ios" ? "iOS" : (id || "—"); }
+  function isAdmin(){ return !!(S.auth && S.auth.role === "admin"); }
 
+  // ===================================================================
+  // theme
+  // ===================================================================
+  function applyTheme(){
+    var root = document.documentElement;
+    if (S.theme === "light" || S.theme === "dark") root.setAttribute("data-theme", S.theme);
+    else root.removeAttribute("data-theme");
+    var dark = S.theme === "dark" || (S.theme === "system" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+    $("themeColor").setAttribute("content", dark ? "#121212" : "#ffffff");
+  }
+  function setTheme(t){ S.theme = t; store.set("uat_theme", t); applyTheme(); renderSidebar(); }
+  if (window.matchMedia) {
+    var mq = matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", function(){ if (S.theme === "system") applyTheme(); });
+  }
+
+  // ===================================================================
+  // dom helpers
+  // ===================================================================
   function el(tag, props, children){
     var e = document.createElement(tag);
     if (props) for (var k in props) {
-      if (k === "class") e.className = props[k];
-      else if (k === "text") e.textContent = props[k];
-      else if (k.indexOf("on") === 0) e.addEventListener(k.slice(2), props[k]);
-      else e.setAttribute(k, props[k]);
+      var v = props[k];
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") e.className = v;
+      else if (k === "text") e.textContent = v;
+      else if (k.indexOf("on") === 0 && typeof v === "function") e.addEventListener(k.slice(2), v);
+      else if (k === "value") e.value = v;
+      else e.setAttribute(k, v === true ? "" : v);
     }
-    (children||[]).forEach(function(c){ if (c) e.appendChild(c); });
+    (children || []).forEach(function(c){
+      if (c === null || c === undefined || c === false) return;
+      e.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(String(c)) : c);
+    });
     return e;
   }
+  function $(id){ return document.getElementById(id); }
+  var ICONS = {
+    dashboard: "M3 3h7v9H3z M14 3h7v5h-7z M14 12h7v9h-7z M3 16h7v5H3z",
+    history: "M12 7v5l3 2 M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9z",
+    menu: "M4 6h16 M4 12h16 M4 18h16",
+    logout: "M15 4h4v16h-4 M10 8l-4 4 4 4 M6 12h10",
+    lock: "M6 11h12v9H6z M9 11V8a3 3 0 0 1 6 0v3"
+  };
+  function icon(name){
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("class", "ico"); svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "1.8");
+    svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
+    var p = document.createElementNS(ns, "path"); p.setAttribute("d", ICONS[name]); svg.appendChild(p);
+    return svg;
+  }
+  function initials(name){
+    var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    return ((parts[0][0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+  }
+  function timeAgo(d){
+    var t = new Date(d).getTime(); if (!t) return "";
+    var s = Math.round((Date.now() - t) / 1000);
+    if (s < 45) return "just now";
+    if (s < 3600) return Math.round(s / 60) + "m ago";
+    if (s < 86400) return Math.round(s / 3600) + "h ago";
+    if (s < 86400 * 7) return Math.round(s / 86400) + "d ago";
+    return new Date(t).toLocaleDateString();
+  }
+  function fmtTime(d){ return new Date(d).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}); }
+  function dayLabel(d){
+    var x = new Date(d), today = new Date(), y = new Date(); y.setDate(today.getDate() - 1);
+    if (x.toDateString() === today.toDateString()) return "Today";
+    if (x.toDateString() === y.toDateString()) return "Yesterday";
+    return x.toLocaleDateString([], {weekday: "short", day: "numeric", month: "short", year: "numeric"});
+  }
+  function plural(n, word){ return n + " " + word + (n === 1 ? "" : "s"); }
+  function isTyping(){
+    var a = document.activeElement;
+    return !!a && (a.tagName === "TEXTAREA" || (a.tagName === "INPUT" && a.type !== "file") || a.tagName === "SELECT");
+  }
+  // Re-render without losing keyboard focus (or the caret) on the element the user was on.
+  function preservingFocus(fn){
+    var a = document.activeElement;
+    var fk = a && a.getAttribute && a.getAttribute("data-fk");
+    var sel = null;
+    try { if (fk && typeof a.selectionStart === "number") sel = [a.selectionStart, a.selectionEnd]; } catch(e){}
+    fn();
+    if (!fk) return;
+    var nodes = document.querySelectorAll("[data-fk]");
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute("data-fk") === fk) {
+        nodes[i].focus({preventScroll: true});
+        if (sel) try { nodes[i].setSelectionRange(sel[0], sel[1]); } catch(e){}
+        break;
+      }
+    }
+  }
 
+  // ===================================================================
+  // toast + modal
+  // ===================================================================
+  function toast(msg, opts){
+    opts = opts || {};
+    var box = $("toasts");
+    var t = el("div", {class: "toast" + (opts.error ? " error" : ""), role: opts.error ? "alert" : "status"}, [el("span", {text: msg})]);
+    if (opts.action) t.appendChild(el("button", {class: "link-btn", text: opts.action.label, onclick: function(){ t.remove(); opts.action.run(); }}));
+    box.appendChild(t);
+    while (box.children.length > 3) box.firstChild.remove();
+    setTimeout(function(){ t.remove(); }, opts.error ? 6000 : 3200);
+  }
+
+  var activeModal = null;
+  function openModal(o){
+    closeModal();
+    var prevFocus = document.activeElement;
+    var submit = el("button", {type: "submit", class: "btn " + (o.danger ? "danger" : "primary"), text: o.submitLabel || "Save"});
+    var actions = el("div", {class: "modal-actions"});
+    if (o.dismissable !== false) actions.appendChild(el("button", {type: "button", class: "btn", text: o.cancelLabel || "Cancel", onclick: function(){ close(); }}));
+    actions.appendChild(submit);
+    var form = el("form", {class: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "modalTitle", novalidate: true}, [
+      el("h3", {id: "modalTitle", text: o.title}),
+      o.desc ? el("p", {class: "desc", text: o.desc}) : null
+    ].concat(o.body || []).concat([actions]));
+    var overlay = el("div", {class: "overlay"}, [form]);
+    overlay.addEventListener("mousedown", function(ev){ if (ev.target === overlay && o.dismissable !== false) close(); });
+    function setBusy(busy, label){
+      submit.disabled = busy;
+      submit.textContent = "";
+      if (busy) submit.appendChild(el("span", {class: "spinner"}));
+      submit.appendChild(document.createTextNode(busy ? (label || "Saving…") : (o.submitLabel || "Save")));
+    }
+    function close(){
+      if (activeModal !== handle) return;
+      overlay.remove(); activeModal = null;
+      if (prevFocus && prevFocus.focus && document.contains(prevFocus)) prevFocus.focus({preventScroll: true});
+    }
+    form.addEventListener("submit", function(ev){ ev.preventDefault(); if (!submit.disabled && o.onSubmit) o.onSubmit(close, setBusy); });
+    var handle = {close: close, dismissable: o.dismissable !== false, node: form};
+    activeModal = handle;
+    document.body.appendChild(overlay);
+    var first = form.querySelector("input, textarea, select") || submit;
+    setTimeout(function(){ first.focus(); }, 0);
+    return handle;
+  }
+  function closeModal(){ if (activeModal) activeModal.close(); }
+
+  // ===================================================================
+  // api
+  // ===================================================================
   function api(path, opts){
     opts = opts || {};
-    var headers = Object.assign({}, opts.headers || {});
-    if (state.auth && state.auth.token) headers["Authorization"] = "Bearer " + state.auth.token;
-    return fetch(path, Object.assign({}, opts, {headers: headers})).then(function(r){
-      if (r.status === 401) { logout(); throw new Error("not_authenticated"); }
-      return r;
+    var headers = {};
+    if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+    if (S.auth && S.auth.token) headers["Authorization"] = "Bearer " + S.auth.token;
+    return fetch(path, {
+      method: opts.method || "GET", headers: headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
+    }).then(function(r){
+      return r.text().then(function(txt){
+        var data = null;
+        try { data = txt ? JSON.parse(txt) : null; } catch(e){}
+        if (r.status === 401 && S.auth && path !== "/api/auth") endSession("Your session expired. Sign in again to continue.");
+        if (!r.ok) {
+          var err = new Error((data && data.error) || ("Request failed (" + r.status + ")"));
+          err.status = r.status; throw err;
+        }
+        return data;
+      });
+    }, function(){
+      var err = new Error("Can't reach the server. Check your connection.");
+      err.network = true; throw err;
     });
   }
 
-  function isTypingInMain(){
-    var active = document.activeElement;
-    var main = document.getElementById("main");
-    if (!active || !main || !main.contains(active)) return false;
-    return active.tagName === "TEXTAREA" || active.tagName === "INPUT";
+  // ===================================================================
+  // connection indicator
+  // ===================================================================
+  function setConn(c){ S.conn = c; renderConn(); }
+  function unsavedCount(){
+    var n = 0;
+    for (var k in S.saves) { var s = S.saves[k]; if (s.inflight || Object.keys(s.pending).length) n++; }
+    return n;
+  }
+  function renderConn(){
+    var n = $("connState"); if (!n) return;
+    var unsaved = unsavedCount();
+    var text = S.conn === "live" ? "Live" : S.conn === "offline" ? "Offline · retrying" : "Syncing…";
+    if (unsaved && S.conn === "offline") text = unsaved + " unsaved · retrying";
+    n.className = "conn " + S.conn;
+    n.title = S.conn === "live" ? "Connected. Results from other testers appear automatically." : "";
+    n.innerHTML = "";
+    n.appendChild(el("span", {class: "dot", "aria-hidden": "true"}));
+    n.appendChild(el("span", {class: "txt", text: text}));
+    n.setAttribute("aria-label", text);
   }
 
-  function setConn(text, isErr){
-    var n = document.getElementById("connState");
-    if (!n) return;
-    n.textContent = text || "";
-    n.classList.toggle("err", !!isErr);
+  // ===================================================================
+  // auth
+  // ===================================================================
+  function showLogin(msg){
+    stopPolling();
+    closeModal();
+    setSidebar(false);
+    $("caseLayer").innerHTML = ""; document.body.classList.remove("modal-open");
+    $("app").hidden = true;
+    $("loginScreen").hidden = false;
+    $("loginErr").textContent = msg || "";
+    var btn = $("loginBtn"); btn.disabled = false; btn.textContent = "Continue";
+    $("loginPassword").value = "";
+    setTimeout(function(){ $("loginPassword").focus(); }, 0);
   }
 
-  // ---------------- auth ----------------
-  function showLogin(err){
-    document.getElementById("app").hidden = true;
-    document.getElementById("loginScreen").hidden = false;
-    document.getElementById("loginErr").textContent = err || "";
+  function endSession(msg){
+    if (!S.auth) return;
+    S.auth = null;
+    store.del("uat_auth");
+    S.results = {}; S.resultsStatus = {}; S.saves = {}; S.attachments = {}; S.comments = {}; S.commentsStatus = {};
+    S.history = null; S.imgCache = {}; S.overviewStatus = "idle"; S.overviewAt = null; S.openCard = null;
+    showLogin(msg);
   }
 
   function logout(){
-    state.auth = null;
-    try { localStorage.removeItem("uat_auth"); } catch(e){}
-    clearInterval(state.pollTimer);
-    showLogin("");
-  }
-
-  function doLogin(){
-    var pw = document.getElementById("loginPassword").value;
-    if (!pw) return;
-    fetch("/api/auth", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({password: pw})
-    }).then(function(r){ return r.json().then(function(b){ return {ok: r.ok, body: b}; }); })
-      .then(function(res){
-        if (!res.ok) { document.getElementById("loginErr").textContent = "Wrong passphrase."; return; }
-        state.auth = {token: res.body.token, role: res.body.role};
-        try { localStorage.setItem("uat_auth", JSON.stringify(state.auth)); } catch(e){}
-        boot();
-      })
-      .catch(function(){ document.getElementById("loginErr").textContent = "Couldn't reach the server."; });
-  }
-
-  // ---------------- header / tabs ----------------
-  function renderTabs(){
-    var tabs = document.getElementById("tabs");
-    tabs.innerHTML = "";
-    APPS.forEach(function(a){
-      tabs.appendChild(el("button", {
-        class: "tab", role: "tab", "aria-selected": String(state.view === "cases" && a.id === state.app),
-        text: a.label,
-        onclick: function(){ state.view = "cases"; state.app = a.id; afterTabChange(); }
-      }));
-    });
-    if (state.auth && state.auth.role === "admin") {
-      tabs.appendChild(el("span", {class: "tab-divider"}));
-      ["summary","history"].forEach(function(v){
-        tabs.appendChild(el("button", {
-          class: "tab", role: "tab", "aria-selected": String(state.view === v),
-          text: v === "summary" ? "Summary" : "History",
-          onclick: function(){ state.view = v; afterTabChange(); }
-        }));
-      });
+    var unsaved = unsavedCount();
+    function go(){
+      var token = S.auth && S.auth.token;
+      if (token) fetch("/api/logout", {method: "POST", headers: {"Authorization": "Bearer " + token}}).catch(function(){});
+      endSession("");
     }
+    if (!unsaved) return go();
+    openModal({
+      title: "Log out with unsaved changes?",
+      desc: plural(unsaved, "result") + " haven't reached the server yet. Logging out now will lose them.",
+      submitLabel: "Log out anyway", danger: true,
+      onSubmit: function(close){ close(); go(); }
+    });
   }
 
-  function afterTabChange(){
-    renderTabs();
-    renderPlatforms();
-    document.getElementById("progressRow").hidden = state.view !== "cases";
-    document.getElementById("filterRow").hidden = state.view !== "cases";
-    if (state.view === "cases") loadApp(state.app);
-    else if (state.view === "summary") renderSummary();
-    else if (state.view === "history") renderHistory();
+  function doLogin(ev){
+    ev.preventDefault();
+    var input = $("loginPassword"), errBox = $("loginErr"), btn = $("loginBtn");
+    var pw = input.value;
+    if (!pw) { errBox.textContent = "Enter the passphrase."; input.focus(); return; }
+    btn.disabled = true; btn.textContent = ""; btn.appendChild(el("span", {class: "spinner"})); btn.appendChild(document.createTextNode("Checking…"));
+    errBox.textContent = "";
+    api("/api/auth", {method: "POST", body: {password: pw}}).then(function(res){
+      S.auth = {token: res.token, role: res.role};
+      store.set("uat_auth", JSON.stringify(S.auth));
+      boot();
+    }).catch(function(err){
+      btn.disabled = false; btn.textContent = "Continue";
+      errBox.textContent = err.status === 401 ? "That passphrase isn't right. Check with your test lead." : err.message;
+      input.select();
+    });
   }
 
-  function renderPlatforms(){
-    var row = document.getElementById("platformRow");
-    row.hidden = state.view !== "cases";
+  // ===================================================================
+  // tester identity
+  // ===================================================================
+  function askTester(onDone){
+    var input = el("input", {class: "text-input", id: "testerName", autocomplete: "name", maxlength: "60", value: S.tester, placeholder: "e.g. Ama Mensah"});
+    var err = el("div", {class: "field-err"});
+    openModal({
+      title: S.tester ? "Change tester name" : "Who's testing?",
+      desc: "Your name is saved with every result, note and screenshot so the team knows who to follow up with.",
+      body: [el("div", {class: "field"}, [el("label", {class: "input-label", for: "testerName", text: "Your name"}), input, err])],
+      submitLabel: S.tester ? "Save" : "Start testing",
+      dismissable: !!S.tester,
+      onSubmit: function(close){
+        var v = input.value.trim().replace(/\s+/g, " ");
+        if (v.length < 2) { err.textContent = "Enter at least 2 characters."; input.classList.add("invalid"); input.focus(); return; }
+        S.tester = v; store.set("uat_tester", v);
+        close();
+        render();
+        if (onDone) onDone();
+      }
+    });
+  }
+  function requireTester(fn){ if (S.tester) return fn(); askTester(fn); }
+
+  // ===================================================================
+  // admin: change passphrase
+  // ===================================================================
+  function openPassphraseModal(){
+    var a = el("input", {class: "text-input", type: "password", id: "pp1", autocomplete: "new-password"});
+    var b = el("input", {class: "text-input", type: "password", id: "pp2", autocomplete: "new-password"});
+    var err = el("div", {class: "field-err", role: "alert"});
+    openModal({
+      title: "Change tester passphrase",
+      desc: "Testers who are already signed in stay signed in. Anyone signing in from now on needs the new passphrase.",
+      body: [
+        el("div", {class: "field"}, [el("label", {class: "input-label", for: "pp1", text: "New passphrase"}), a]),
+        el("div", {class: "field"}, [el("label", {class: "input-label", for: "pp2", text: "Confirm passphrase"}), b, err])
+      ],
+      submitLabel: "Update passphrase",
+      onSubmit: function(close, setBusy){
+        err.textContent = "";
+        if (a.value.length < 4) { err.textContent = "Use at least 4 characters."; a.focus(); return; }
+        if (a.value !== b.value) { err.textContent = "The two passphrases don't match."; b.focus(); return; }
+        setBusy(true, "Updating…");
+        api("/api/admin/password", {method: "POST", body: {newPassword: a.value}}).then(function(){
+          close(); toast("Tester passphrase updated. Share it with your testers.");
+        }).catch(function(e){ setBusy(false); err.textContent = e.message; });
+      }
+    });
+  }
+
+  // ===================================================================
+  // stats
+  // ===================================================================
+  function statusOf(map, caseId){
+    var r = map && map[caseId];
+    var v = r && r.result;
+    return CLS[v] && v !== "Not run" ? v : "Not run";
+  }
+  // Counts for one app, on one platform or (plat falsy) on both.
+  function projectStats(appId, plat){
+    var cases = S.cases[appId];
+    if (!cases) return null;
+    var plats = plat ? [plat] : PLATFORMS.map(function(p){ return p.id; });
+    var s = {total: 0, done: 0, "Pass": 0, "Fail": 0, "Blocked": 0, "N/A": 0, "Not run": 0};
+    plats.forEach(function(p){
+      var map = S.results[rk(appId, p)] || {};
+      cases.forEach(function(c){ var st = statusOf(map, c.id); s[st]++; s.total++; if (st !== "Not run") s.done++; });
+    });
+    s.pct = s.total ? Math.round(100 * s.done / s.total) : 0;
+    s.issues = s.Fail + s.Blocked;
+    return s;
+  }
+  function tally(){ return projectStats(S.app, S.platform) || {total: 0, done: 0, "Pass": 0, "Fail": 0, "Blocked": 0, "N/A": 0, "Not run": 0, pct: 0}; }
+  // ---- motion: numbers count up and bars grow from their last value ----
+  var REDUCED = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var animPrev = {}, animQueue = [];
+  function flushAnims(){
+    if (!animQueue.length) return;
+    var q = animQueue; animQueue = [];
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ q.forEach(function(f){ f(); }); }); });
+  }
+  function stackedBar(s, key){
+    var track = el("div", {class: "progress-track"});
+    ["Pass", "Fail", "Blocked", "N/A"].forEach(function(k){
+      if (!s || !s[k] || !s.total) return;
+      var target = 100 * s[k] / s.total;
+      var seg = el("span", {title: k + ": " + s[k]});
+      seg.style.background = "var(--" + CLS[k] + ")";
+      var ak = key ? key + "|" + k : null;
+      var from = ak && !REDUCED ? (animPrev[ak] !== undefined ? animPrev[ak] : 0) : target;
+      if (ak) animPrev[ak] = target;
+      seg.style.width = from + "%";
+      if (from !== target) animQueue.push(function(){ seg.style.width = target + "%"; });
+      track.appendChild(seg);
+    });
+    return track;
+  }
+  function countNode(cls, key, value, suffix){
+    suffix = suffix || "";
+    var node = el("div", {class: cls});
+    var from = !REDUCED ? (animPrev[key] !== undefined ? animPrev[key] : 0) : value;
+    animPrev[key] = value;
+    node.textContent = from + suffix;
+    if (from !== value) animQueue.push(function(){
+      var t0 = performance.now(), dur = 650;
+      (function step(now){
+        var p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+        node.textContent = Math.round(from + (value - from) * e) + suffix;
+        if (p < 1) requestAnimationFrame(step);
+      })(t0);
+    });
+    return node;
+  }
+  function donut(s, key){
+    var ns = "http://www.w3.org/2000/svg", R = 40, C = 2 * Math.PI * R;
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 100 100"); svg.setAttribute("class", "donut"); svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", s.Pass + " pass, " + s.Fail + " fail, " + s.Blocked + " blocked, " + s["N/A"] + " N/A, " + s["Not run"] + " not run");
+    function circ(cls){
+      var c = document.createElementNS(ns, "circle");
+      c.setAttribute("cx", "50"); c.setAttribute("cy", "50"); c.setAttribute("r", String(R)); c.setAttribute("class", cls);
+      return c;
+    }
+    svg.appendChild(circ("donut-track"));
+    var off = 0;
+    ["Pass", "Fail", "Blocked", "N/A"].forEach(function(k){
+      var len = s.total ? C * s[k] / s.total : 0;
+      var c = circ("donut-seg"); c.style.stroke = "var(--" + CLS[k] + ")";
+      var ak = key + "|" + k, prev = animPrev[ak];
+      var from = REDUCED ? {len: len, off: off} : (prev || {len: 0, off: off});
+      animPrev[ak] = {len: len, off: off};
+      c.style.strokeDasharray = from.len + " " + C; c.style.strokeDashoffset = String(-from.off);
+      if (from.len !== len || from.off !== off) {
+        var L = len, O = off;
+        animQueue.push(function(){ c.style.strokeDasharray = L + " " + C; c.style.strokeDashoffset = String(-O); });
+      }
+      svg.appendChild(c);
+      off += len;
+    });
+    return svg;
+  }
+  function lastActivity(appId, scope){
+    var best = null;
+    PLATFORMS.forEach(function(p){
+      if (scope && p.id !== scope) return;
+      var m = S.results[rk(appId, p.id)] || {};
+      Object.keys(m).forEach(function(id){
+        var r = m[id];
+        if (r.updatedAt && r.result && (!best || new Date(r.updatedAt) > new Date(best.updatedAt))) best = r;
+      });
+    });
+    return best;
+  }
+
+  // ===================================================================
+  // shell: sidebar + top bar
+  // ===================================================================
+  function isDrawer(){ return !!(window.matchMedia && matchMedia("(max-width:1023px)").matches); }
+  function setSidebar(open){
+    S.sidebarOpen = open;
+    document.body.classList.toggle("sb-open", open);
+    if (open) setTimeout(function(){ var f = $("sidebar").querySelector("[aria-current=page]") || $("sbClose"); f.focus(); }, 0);
+  }
+
+  function renderSidebar(){
+    var nav = $("sbNav");
+    nav.innerHTML = "";
+    var allIssues = 0;
+    APPS.forEach(function(a){ var s = projectStats(a.id); if (s) allIssues += s.issues; });
+    nav.appendChild(el("button", {class: "sb-link", "aria-current": S.view === "dashboard" ? "page" : null, "data-fk": "nav:dashboard", onclick: function(){ goView("dashboard"); }},
+      [icon("dashboard"), "Dashboard", allIssues ? el("span", {class: "sb-badge count", text: String(allIssues), title: plural(allIssues, "open issue")}) : null]));
+    if (isAdmin()) {
+      nav.appendChild(el("button", {class: "sb-link", "aria-current": S.view === "history" ? "page" : null, "data-fk": "nav:history", onclick: function(){ goView("history"); }},
+        [icon("history"), "History"]));
+    }
+
+    var list = $("sbProjects");
+    list.innerHTML = "";
+    var active = 0;
+    APPS.forEach(function(a){
+      var s = projectStats(a.id);
+      if (s && s.done) active++;
+      var current = S.view === "cases" && S.app === a.id;
+      list.appendChild(el("button", {
+        class: "sb-proj", "aria-current": current ? "page" : null, "data-fk": "proj:" + a.id,
+        "aria-label": a.label + (s ? ", " + s.pct + "% done" + (s.issues ? ", " + plural(s.issues, "issue") : "") : ""),
+        onclick: function(){ goCases(a.id, S.platform); }
+      }, [
+        el("span", {class: "row"}, [
+          el("span", {class: "name", text: a.label}),
+          s && s.issues ? el("span", {class: "sb-badge", text: plural(s.issues, "issue")})
+            : s && s.total && s.done === s.total ? el("span", {class: "sb-badge ok", text: "Done"}) : null
+        ]),
+        stackedBar(s, "sb:" + a.id),
+        el("span", {class: "meta"}, [
+          el("span", {text: s ? s.done + "/" + s.total + " runs" : "Loading…"}),
+          el("span", {text: s ? s.pct + "%" : ""})
+        ])
+      ]));
+    });
+    $("sbProjMeta").textContent = active + "/" + APPS.length + " active";
+
+    var who = $("whoBtn");
+    who.innerHTML = "";
+    who.classList.toggle("missing", !S.tester);
+    who.appendChild(el("span", {class: "avatar", text: initials(S.tester), "aria-hidden": "true"}));
+    who.appendChild(el("span", {class: "txt"}, [
+      el("span", {class: "name", text: S.tester || "Set your name"}),
+      el("span", {class: "sub", text: S.tester ? "Testing as you · change" : "Required before recording"})
+    ]));
+    who.appendChild(el("span", {class: "role-badge" + (isAdmin() ? " admin" : ""), text: isAdmin() ? "admin" : "tester"}));
+    who.setAttribute("aria-label", S.tester ? "Testing as " + S.tester + ". Change name" : "Set your tester name");
+
+    var seg = $("themeSeg");
+    seg.innerHTML = "";
+    THEMES.forEach(function(t){
+      seg.appendChild(el("button", {type: "button", "aria-pressed": String(S.theme === t.id), "data-fk": "theme:" + t.id, text: t.label,
+        title: t.id === "system" ? "Follow your device setting" : t.label + " mode",
+        onclick: function(){ setTheme(t.id); }}));
+    });
+    $("adminSettingsBtn").hidden = !isAdmin();
+  }
+
+  var TITLES = {
+    dashboard: {title: "Dashboard", sub: "Where every project stands. Latest result per case across all testers."},
+    history: {title: "History", sub: "Every result and note change, newest first."},
+    cases: {sub: "Walk through each case on the app, pick a result, add a note if anything's off."}
+  };
+  function renderTopbar(){
+    var crumbs = $("crumbs");
+    crumbs.innerHTML = "";
+    if (S.view === "cases") {
+      crumbs.appendChild(el("button", {type: "button", text: "Dashboard", onclick: function(){ goView("dashboard"); }}));
+      crumbs.appendChild(el("span", {text: "/", "aria-hidden": "true"}));
+      crumbs.appendChild(el("span", {text: "Projects"}));
+    }
+    crumbs.hidden = S.view !== "cases";
+    $("pageTitle").textContent = S.view === "cases" ? appLabel(S.app) : TITLES[S.view].title;
+    $("subtitle").textContent = TITLES[S.view].sub;
+    $("contextRow").hidden = S.view !== "cases";
+    var row = $("platformRow");
     row.innerHTML = "";
     PLATFORMS.forEach(function(p){
       row.appendChild(el("button", {
-        class: "platform-chip", "aria-pressed": String(state.platform === p.id), text: p.label,
-        onclick: function(){
-          if (state.platform === p.id) return;
-          state.platform = p.id;
-          try { localStorage.setItem("uat_platform", p.id); } catch(e){}
-          renderPlatforms();
-          loadApp(state.app);
-        }
+        class: "platform-chip", "aria-pressed": String(S.platform === p.id), text: p.label, "data-fk": "plat:" + p.id,
+        onclick: function(){ if (S.platform !== p.id) goCases(S.app, p.id); }
       }));
     });
+    renderProgress();
+    renderConn();
+    document.title = (S.view === "cases" ? appLabel(S.app) + " · " : S.view === "history" ? "History · " : "") + "UAT Tracker";
   }
 
-  function renderFilters(){
-    var row = document.getElementById("filterRow");
-    row.innerHTML = "";
-    FILTERS.forEach(function(f){
-      row.appendChild(el("button", {
-        class: "filter-chip", "aria-pressed": String(state.filter === f), text: f,
-        onclick: function(){ state.filter = f; renderList(); }
-      }));
-    });
+  function renderProgress(){
+    var track = $("progressTrack"), label = $("progressLabel");
+    track.innerHTML = ""; label.innerHTML = "";
+    var ready = S.casesStatus[S.app] === "ready" && S.results[curKey()];
+    if (!ready) { label.textContent = "Loading…"; track.removeAttribute("aria-valuenow"); return; }
+    var c = tally();
+    if (!c.total) { label.textContent = "No cases"; return; }
+    var bar = stackedBar(c, "hdr:" + curKey());
+    while (bar.firstChild) track.appendChild(bar.firstChild);
+    track.setAttribute("aria-valuemax", String(c.total));
+    track.setAttribute("aria-valuenow", String(c.done));
+    track.setAttribute("aria-label", c.done + " of " + c.total + " cases recorded on " + platLabel(S.platform));
+    label.appendChild(el("b", {text: c.done + " / " + c.total}));
+    label.appendChild(document.createTextNode(" done · " + c.pct + "%"));
   }
 
-  function updateProgress(){
-    var cases = state.cases[state.app] || [];
-    var track = document.getElementById("progressTrack");
-    var label = document.getElementById("progressLabel");
-    track.innerHTML = "";
-    if (!cases.length) { label.textContent = "0 / 0"; return; }
-    var counts = {Pass:0, Fail:0, Blocked:0, "N/A":0, done:0};
-    var resultsForPlatform = state.results[state.platform] || {};
-    cases.forEach(function(c){
-      var r = resultsForPlatform[c.id];
-      if (r && r.result && r.result !== "Not run") { counts.done++; counts[r.result] = (counts[r.result]||0)+1; }
-    });
-    [["Pass"],["Fail"],["Blocked"],["N/A"]].forEach(function(pair){
-      var n = counts[pair[0]] || 0;
-      if (!n) return;
-      var seg = el("span", {style: "width:" + (100*n/cases.length) + "%"});
-      seg.style.background = pair[0] === "Pass" ? "var(--pass)" : pair[0] === "Fail" ? "var(--fail)" : pair[0] === "Blocked" ? "var(--blocked)" : "var(--na)";
-      track.appendChild(seg);
-    });
-    label.textContent = counts.done + " / " + cases.length;
+  // ===================================================================
+  // navigation
+  // ===================================================================
+  function goCases(appId, platform){
+    flushAllComments();
+    var changed = appId !== S.app || platform !== S.platform || S.view !== "cases";
+    S.view = "cases"; S.app = appId; S.platform = platform;
+    if (changed) { S.openCard = null; S.filter = "All"; S.query = ""; }
+    store.set("uat_app", appId); store.set("uat_platform", platform); store.set("uat_view", "cases");
+    if (isDrawer()) setSidebar(false);
+    loadCases();
+    window.scrollTo({top: 0});
+  }
+  function goView(v){
+    flushAllComments();
+    if (v === "history" && !isAdmin()) v = "dashboard";
+    S.view = v; S.openCard = null; store.set("uat_view", v);
+    if (isDrawer()) setSidebar(false);
+    if (v === "dashboard") loadOverview().catch(function(){}).then(function(){ if (S.view === "dashboard") render(); });
+    else if (v === "history") loadHistory();
+    render();
+    window.scrollTo({top: 0});
+  }
+  // Jump straight to a case from anywhere (dashboard, history).
+  function goToCase(appId, platform, caseId){
+    if (!APPS.some(function(a){ return a.id === appId; })) return;
+    S.pendingOpen = caseId;
+    goCases(appId, validPlatform(platform));
   }
 
-  var saveTimers = {};
-  function saveResult(caseId, patch){
-    var platform = state.platform;
-    var existing = state.results[platform][caseId] || {};
-    var next = Object.assign({}, existing, patch, {
-      caseId: caseId, app: state.app, platform: platform, tester: state.tester || "anonymous"
-    });
-    state.results[platform][caseId] = next;
-    api("/api/results", {
-      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(next)
-    }).then(function(r){ if (!r.ok) throw new Error("save failed"); setConn("", false); })
-      .catch(function(){ setConn("Couldn't save — retrying", true); });
-  }
-
-  function matchesFilter(c){
-    if (state.filter === "All") return true;
-    var r = state.results[state.platform][c.id];
-    var key = (r && r.result) || "Not run";
-    return key === state.filter;
-  }
-
-  function renderCard(c){
-    var r = state.results[state.platform][c.id] || {};
-    var resultKey = r.result || "Not run";
-    var pillCls = PILL_CLASS[resultKey] || "notrun";
-
-    var card = el("div", {class: "card" + (state.openCard === c.id ? " open" : "")});
-    var pill = el("span", {class: "pill " + pillCls, text: resultKey});
-    var prio = el("span", {class: "prio", text: c.priority || ""});
-    var right = el("div", {class: "case-right"}, [pill, prio]);
-
-    var head = el("div", {
-      class: "card-head",
-      onclick: function(){ state.openCard = (state.openCard === c.id) ? null : c.id; renderList(); }
-    }, [
-      el("span", {class: "case-id", text: c.id}),
-      el("div", {class: "case-main"}, [
-        el("p", {class: "case-scenario", text: c.scenario}),
-        el("p", {class: "case-module", text: c.module})
-      ]),
-      right,
-      el("span", {class: "chev", text: "›"})
-    ]);
-    card.appendChild(head);
-
-    var body = el("div", {class: "card-body"});
-    body.appendChild(el("p", {class: "field-label", text: "Steps to follow"}));
-    body.appendChild(el("p", {class: "steps", text: c.steps}));
-    body.appendChild(el("p", {class: "field-label", text: "Expected result"}));
-    body.appendChild(el("p", {class: "expected", text: c.expected}));
-
-    var resultRow = el("div", {class: "result-row"});
-    RESULTS.forEach(function(opt){
-      var pressed = resultKey === opt.key;
-      resultRow.appendChild(el("button", {
-        class: "result-btn " + opt.cls, "aria-pressed": String(pressed), text: opt.key,
-        onclick: function(){ saveResult(c.id, {result: opt.key}); renderList(); }
-      }));
-    });
-    body.appendChild(resultRow);
-
-    var comment = el("textarea", {class: "comment-box", placeholder: "Anything odd? Describe what you saw…"});
-    comment.value = r.comments || "";
-    var saveState = el("div", {class: "save-state"});
-    comment.addEventListener("blur", function(){ renderList(); });
-    comment.addEventListener("input", function(){
-      saveState.textContent = ""; saveState.classList.remove("saved");
-      clearTimeout(saveTimers[c.id]);
-      var val = comment.value;
-      saveTimers[c.id] = setTimeout(function(){
-        saveResult(c.id, {comments: val});
-        saveState.textContent = "Saved"; saveState.classList.add("saved");
-      }, 700);
-    });
-    body.appendChild(comment);
-    body.appendChild(saveState);
-
-    var isOpen = state.openCard === c.id;
-    body.appendChild(el("p", {class: "field-label", text: "Screenshots"}));
-    var shotRow = el("div", {class: "shot-row"});
-    var attachments = state.attachments[state.platform][c.id] || [];
-    if (isOpen) {
-      attachments.forEach(function(a){
-        var thumb = el("div", {class: "shot-thumb"});
-        var img = el("img", {alt: a.filename || "screenshot"});
-        loadAttachmentImage(a._id, img);
-        img.addEventListener("click", function(){ openLightbox(a._id); });
-        var rm = el("button", {
-          text: "×",
-          onclick: function(ev){ ev.stopPropagation(); deleteAttachment(a._id, c.id); }
-        });
-        thumb.appendChild(img); thumb.appendChild(rm);
-        shotRow.appendChild(thumb);
-      });
-      var addLabel = el("label", {class: "shot-add", text: "+"});
-      var fileInput = el("input", {type: "file", accept: "image/*"});
-      fileInput.addEventListener("change", function(){
-        var file = fileInput.files[0];
-        if (file) uploadAttachment(c.id, file);
-      });
-      addLabel.appendChild(fileInput);
-      shotRow.appendChild(addLabel);
-    } else if (attachments.length) {
-      shotRow.appendChild(el("span", {class: "case-module", text: attachments.length + " attached — open the case to view"}));
-    }
-    body.appendChild(shotRow);
-
-    card.appendChild(body);
-    return card;
-  }
-
-  function loadAttachmentImage(id, imgEl){
-    api("/api/attachments/" + id + "/image").then(function(r){ return r.json(); })
-      .then(function(data){ imgEl.src = "data:" + data.mimeType + ";base64," + data.image; })
-      .catch(function(){});
-  }
-
-  function openLightbox(id){
-    api("/api/attachments/" + id + "/image").then(function(r){ return r.json(); }).then(function(data){
-      var box = el("div", {class: "shot-lightbox", onclick: function(){ box.remove(); }});
-      box.appendChild(el("img", {src: "data:" + data.mimeType + ";base64," + data.image}));
-      document.body.appendChild(box);
-    }).catch(function(){});
-  }
-
-  function uploadAttachment(caseId, file){
-    var platform = state.platform;
-    var reader = new FileReader();
-    reader.onload = function(){
-      var dataUrl = reader.result;
-      var base64 = dataUrl.split(",")[1];
-      api("/api/attachments", {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          caseId: caseId, app: state.app, platform: platform, tester: state.tester || "anonymous",
-          image: base64, filename: file.name, mimeType: file.type || "image/png"
-        })
-      }).then(function(r){ return r.json().then(function(b){ return {ok:r.ok, body:b}; }); })
-        .then(function(res){
-          if (!res.ok) { alert(res.body.error || "Could not upload."); return; }
-          return loadAttachments(state.app, platform).then(renderList);
-        }).catch(function(){ alert("Could not reach the server."); });
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function deleteAttachment(id, caseId){
-    var platform = state.platform;
-    api("/api/attachments/" + id, {method: "DELETE"})
-      .then(function(){ return loadAttachments(state.app, platform); })
-      .then(renderList)
-      .catch(function(){});
-  }
-
-  function loadAttachments(appId, platform){
-    return api("/api/attachments?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform))
-      .then(function(r){ return r.json(); })
-      .then(function(rows){
-        var byCase = {};
-        rows.forEach(function(a){ (byCase[a.caseId] = byCase[a.caseId] || []).push(a); });
-        state.attachments[platform] = byCase;
-      }).catch(function(){});
-  }
-
-  function renderNotes(){
-    var box = el("div", {class: "notes-box"});
-    box.appendChild(el("p", {class: "notes-title", text: "General notes for this app"}));
-    var form = el("div", {class: "notes-form"});
-    var ta = el("textarea", {placeholder: "Anything worth flagging that isn't tied to one case?"});
-    var btn = el("button", {text: "Post"});
-    btn.addEventListener("click", function(){
-      var text = ta.value.trim();
-      if (!text) return;
-      api("/api/comments", {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({app: state.app, tester: state.tester || "anonymous", text: text})
-      }).then(function(){ ta.value = ""; return loadComments(state.app); }).then(renderList);
-    });
-    form.appendChild(ta); form.appendChild(btn);
-    box.appendChild(form);
-    var list = (state.comments[state.app] || []);
-    if (!list.length) box.appendChild(el("p", {class: "note-row", text: "No notes yet."}));
-    list.forEach(function(n){
-      box.appendChild(el("div", {class: "note-row"}, [
-        el("div", {class: "note-meta", text: n.tester + " · " + new Date(n.createdAt).toLocaleString()}),
-        el("div", {text: n.text})
-      ]));
-    });
-    return box;
-  }
-
-  function renderList(){
-    if (state.view !== "cases") return;
-    var main = document.getElementById("main");
-    main.innerHTML = "";
-
-    var cases = state.cases[state.app];
-    if (!state.loaded[state.app] || !state.resultsLoaded[state.platform][state.app]) {
-      main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Loading " + state.app + "…"})]));
-      return;
-    }
-    if (!cases || !cases.length) {
-      main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "No test cases yet"})]));
-      return;
-    }
-
-    var bar = el("div", {class: "tester-bar"}, [
-      el("span", {class: "lbl", text: "Testing as"}),
-      (function(){
-        var input = el("input", {value: state.tester});
-        input.addEventListener("change", function(){
-          state.tester = input.value.trim();
-          try { localStorage.setItem("uat_tester", state.tester); } catch(e){}
-        });
-        return input;
-      })()
-    ]);
-    main.appendChild(bar);
-    main.appendChild(renderNotes());
-
-    var filtered = cases.filter(matchesFilter);
-    var grid = el("div", {class: "case-grid"});
-    if (!filtered.length) {
-      grid.appendChild(el("div", {class: "empty"}, [el("strong", {text: "No cases match this filter"})]));
-    } else {
-      filtered.forEach(function(c){ grid.appendChild(renderCard(c)); });
-    }
-    main.appendChild(grid);
-    updateProgress();
-  }
-
-  // ---------------- summary / history (admin) ----------------
-  function renderSummary(){
-    var main = document.getElementById("main");
-    main.innerHTML = "";
-    main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Loading summary…"})]));
-    api("/api/admin/summary").then(function(r){ return r.json(); }).then(function(rows){
+  function render(){
+    if (!S.auth) return;
+    preservingFocus(function(){
+      renderSidebar();
+      renderTopbar();
+      var main = $("main");
       main.innerHTML = "";
-      var table = el("table", {class: "summary-table"});
-      var head = el("tr", {}, ["App","Platform","Progress","Total","Pass","Fail","Blocked","N/A","Not run"].map(function(h){ return el("th", {text: h}); }));
-      table.appendChild(el("thead", {}, [head]));
-      var body = el("tbody");
-      var label = {};
-      APPS.forEach(function(a){ label[a.id] = a.label; });
-      var platformLabel = {}; PLATFORMS.forEach(function(p){ platformLabel[p.id] = p.label; });
-      rows.forEach(function(row){
-        var bar = el("span", {class: "summary-bar"}, [el("span", {style: "width:" + row.pct + "%"})]);
-        var progressCell = el("td", {}, [bar, document.createTextNode(row.pct + "%")]);
-        body.appendChild(el("tr", {}, [
-          el("td", {text: label[row.app] || row.app}),
-          el("td", {text: platformLabel[row.platform] || row.platform}),
-          progressCell,
-          el("td", {class: "num", text: String(row.total)}),
-          el("td", {class: "num", text: String(row.pass)}),
-          el("td", {class: "num", text: String(row.fail)}),
-          el("td", {class: "num", text: String(row.blocked)}),
-          el("td", {class: "num", text: String(row.na)}),
-          el("td", {class: "num", text: String(row.notRun)})
-        ]));
-      });
-      table.appendChild(body);
-      main.appendChild(table);
-    }).catch(function(){ main.innerHTML = ""; main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Couldn't load summary"})])); });
+      if (S.view === "cases") renderCases(main);
+      else if (S.view === "dashboard") renderDashboard(main);
+      else renderHistory(main);
+      renderCaseModal();
+    });
+    S.dirty = false;
+    flushAnims();
+    syncUrl();
   }
 
-  function renderHistory(){
-    var main = document.getElementById("main");
-    main.innerHTML = "";
-    main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Loading history…"})]));
-    api("/api/admin/history").then(function(r){ return r.json(); }).then(function(rows){
-      main.innerHTML = "";
-      if (!rows.length) { main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "No changes yet"})])); return; }
-      rows.forEach(function(h){
-        main.appendChild(el("div", {class: "history-row"}, [
-          el("div", {class: "note-meta", text: new Date(h.changedAt).toLocaleString() + " · " + h.app + " · " + (h.platform || "—") + " · " + h.caseId + " · " + h.tester}),
-          el("div", {text: (h.result || "(comment only)") + (h.comments ? " — " + h.comments : "")})
-        ]));
-      });
-    }).catch(function(){ main.innerHTML = ""; main.appendChild(el("div", {class: "empty"}, [el("strong", {text: "Couldn't load history"})])); });
+  // ===================================================================
+  // routing: #/dashboard · #/history · #/p/<app>/<platform>[/<caseId>]
+  // ===================================================================
+  var applyingRoute = false, modalPushed = false;
+  function routeHash(){
+    if (S.view === "dashboard") return "#/dashboard";
+    if (S.view === "history") return "#/history";
+    var c = S.openCard || S.pendingOpen;
+    return "#/p/" + S.app + "/" + S.platform + (c ? "/" + encodeURIComponent(c) : "");
+  }
+  function parseRoute(h){
+    var parts = String(h || "").replace(/^#\/?/, "").split("/").map(function(x){ try { return decodeURIComponent(x); } catch(e){ return x; } });
+    if (parts[0] === "dashboard") return {view: "dashboard"};
+    if (parts[0] === "history") return {view: "history"};
+    if (parts[0] === "p" && APPS.some(function(a){ return a.id === parts[1]; }))
+      return {view: "cases", app: parts[1], platform: validPlatform(parts[2]), caseId: parts[3] || null};
+    return null;
+  }
+  function syncUrl(){
+    if (!S.auth) return;
+    var h = routeHash();
+    if (location.hash === h) return;
+    var cur = parseRoute(location.hash), next = parseRoute(h);
+    // Stepping between cases inside the dialog replaces history instead of stacking it.
+    var sameList = cur && next && cur.view === "cases" && next.view === "cases" && cur.app === next.app && cur.platform === next.platform;
+    var stepping = sameList && cur.caseId && next.caseId;
+    var closing = sameList && cur.caseId && !next.caseId;
+    var opening = sameList && !cur.caseId && next.caseId;
+    // Closing a dialog we opened from the list goes back, so Back never reopens it.
+    if (closing && modalPushed && !applyingRoute) { modalPushed = false; history.back(); return; }
+    if (applyingRoute || S.replaceUrl || stepping || closing || !location.hash) history.replaceState(null, "", h);
+    else { history.pushState(null, "", h); modalPushed = !!opening; }
+    S.replaceUrl = false;
+  }
+  function applyRoute(r){
+    applyingRoute = true;
+    try {
+      r = r || {view: "dashboard"};
+      if (r.view === "cases") {
+        if (S.view === "cases" && S.app === r.app && S.platform === r.platform) { if (S.openCard !== r.caseId) openCase(r.caseId, {reveal: true}); }
+        else { S.pendingOpen = r.caseId; goCases(r.app, r.platform); }
+      } else if (S.view !== r.view || S.openCard) goView(r.view);
+    } finally { applyingRoute = false; }
+  }
+  window.addEventListener("popstate", function(){
+    if (!S.auth) return;
+    closeModal(); closeLightbox();
+    var r = parseRoute(location.hash);
+    if (!(r && r.view === "cases" && r.caseId)) modalPushed = false;
+    applyRoute(r);
+  });
+
+  // ===================================================================
+  // data loading
+  // ===================================================================
+  function hasActiveSave(k, caseId){
+    var s = S.saves[k + "|" + caseId];
+    return !!s && (s.inflight || Object.keys(s.pending).length > 0);
+  }
+  function signature(map){
+    return Object.keys(map || {}).sort().map(function(id){
+      var r = map[id]; return id + ":" + (r.result || "") + ":" + (r.tester || "") + ":" + (r.comments || "").length + ":" + r.updatedAt;
+    }).join("|");
+  }
+  // Several testers can record the same case; keep the most recent one
+  // (same rule as the server summary). Replaces the given keys wholesale.
+  function ingestResults(rows, keys){
+    var fresh = {};
+    keys.forEach(function(k){ fresh[k] = {}; });
+    (rows || []).forEach(function(row){
+      if (!row.caseId) return;
+      var bucket = fresh[rk(row.app, row.platform)];
+      if (!bucket) return;
+      var cur = bucket[row.caseId];
+      if (!cur || new Date(row.updatedAt) > new Date(cur.updatedAt)) bucket[row.caseId] = row;
+    });
+    var changed = false;
+    keys.forEach(function(k){
+      var prev = S.results[k] || {};
+      Object.keys(prev).forEach(function(id){ if (hasActiveSave(k, id)) fresh[k][id] = prev[id]; });
+      if (!S.results[k] || signature(prev) !== signature(fresh[k])) changed = true;
+      S.results[k] = fresh[k];
+      S.resultsStatus[k] = "ready";
+    });
+    return changed;
   }
 
-  // ---------------- data loading ----------------
-  function loadComments(appId){
-    return api("/api/comments?app=" + encodeURIComponent(appId)).then(function(r){ return r.json(); })
-      .then(function(rows){ state.comments[appId] = rows; })
-      .catch(function(){});
+  // Everything, for the dashboard and sidebar: all cases + all results.
+  function loadOverview(){
+    if (S.overviewStatus !== "ready") S.overviewStatus = "loading";
+    return Promise.all([api("/api/testcases"), api("/api/results")]).then(function(res){
+      var byApp = {};
+      APPS.forEach(function(a){ byApp[a.id] = []; });
+      (res[0] || []).forEach(function(c){ if (byApp[c.app]) byApp[c.app].push(c); });
+      var casesChanged = false;
+      APPS.forEach(function(a){
+        byApp[a.id].sort(function(x, y){ return (x.order || 0) - (y.order || 0); });
+        if (!S.cases[a.id] || S.cases[a.id].length !== byApp[a.id].length) casesChanged = true;
+        S.cases[a.id] = byApp[a.id]; S.casesStatus[a.id] = "ready";
+      });
+      var keys = [];
+      APPS.forEach(function(a){ PLATFORMS.forEach(function(p){ keys.push(rk(a.id, p.id)); }); });
+      var changed = ingestResults(res[1], keys) || casesChanged || !S.overviewAt;
+      S.overviewStatus = "ready"; S.overviewAt = Date.now();
+      setConn("live");
+      return changed;
+    }).catch(function(e){
+      S.overviewStatus = S.overviewAt ? "ready" : "error";
+      S.loadError.overview = e.message;
+      setConn(e.network ? "offline" : "syncing");
+      throw e;
+    });
   }
 
   function fetchResults(appId, platform){
-    return api("/api/results?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform))
-      .then(function(r){ if (!r.ok) throw new Error("bad response"); return r.json(); })
-      .then(function(rows){
-        var byCase = {};
-        rows.forEach(function(row){ if (row.caseId) byCase[row.caseId] = row; });
-        state.results[platform] = byCase;
-        setConn("", false);
-      })
-      .catch(function(){ setConn("Offline — showing last known state", true); });
+    var k = rk(appId, platform);
+    return api("/api/results?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform)).then(function(rows){
+      var changed = ingestResults(rows, [k]);
+      setConn("live");
+      return changed;
+    }).catch(function(e){
+      if (!S.results[k]) S.resultsStatus[k] = "error";
+      S.loadError[k] = e.message;
+      setConn(e.network ? "offline" : "syncing");
+      throw e;
+    });
   }
 
-  function loadApp(appId){
-    var platform = state.platform;
-    state.loaded[appId] = state.loaded[appId] || false;
-    renderFilters();
-    renderList();
+  function loadAttachments(appId, platform){
+    return api("/api/attachments?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform)).then(function(rows){
+      var byCase = {};
+      (rows || []).forEach(function(a){ (byCase[a.caseId] = byCase[a.caseId] || []).push(a); });
+      S.attachments[rk(appId, platform)] = byCase;
+    }).catch(function(){ /* non-critical */ });
+  }
 
-    var casesPromise = state.cases[appId]
-      ? Promise.resolve(state.cases[appId])
-      : api("/api/testcases?app=" + encodeURIComponent(appId)).then(function(r){ return r.json(); });
+  function loadComments(appId){
+    return api("/api/comments?app=" + encodeURIComponent(appId)).then(function(rows){
+      S.comments[appId] = rows || []; S.commentsStatus[appId] = "ready";
+    }).catch(function(){ if (!S.comments[appId]) S.commentsStatus[appId] = "error"; });
+  }
 
-    Promise.all([casesPromise, fetchResults(appId, platform), loadComments(appId), loadAttachments(appId, platform)]).then(function(res){
-      state.cases[appId] = res[0];
-      state.loaded[appId] = true;
-      state.resultsLoaded[platform][appId] = true;
-      renderList();
-    }).catch(function(){ setConn("Couldn't load — check the server", true); });
+  function loadCases(){
+    var appId = S.app, platform = S.platform, k = curKey();
+    if (S.casesStatus[appId] !== "ready") S.casesStatus[appId] = "loading";
+    if (S.resultsStatus[k] === "error") S.resultsStatus[k] = "loading";
+    render();
 
-    clearInterval(state.pollTimer);
-    state.pollTimer = setInterval(function(){
-      if (state.view === "cases") fetchResults(appId, state.platform).then(function(){
-        if (!isTypingInMain()) renderList();
+    var casesP = S.casesStatus[appId] === "ready"
+      ? Promise.resolve(S.cases[appId])
+      : api("/api/testcases?app=" + encodeURIComponent(appId)).then(function(rows){
+          S.cases[appId] = rows || []; S.casesStatus[appId] = "ready"; return rows;
+        }, function(e){ S.casesStatus[appId] = "error"; S.loadError[appId] = e.message; throw e; });
+
+    Promise.allSettled([casesP, fetchResults(appId, platform), loadComments(appId), loadAttachments(appId, platform)])
+      .then(function(){
+        if (S.view !== "cases" || S.app !== appId || S.platform !== platform) return;
+        var want = S.pendingOpen; S.pendingOpen = null;
+        if (want && (S.cases[appId] || []).some(function(c){ return c.id === want; })) openCase(want, {reveal: true});
+        else { if (want) { S.replaceUrl = true; toast("Case " + want + " wasn't found in " + appLabel(appId) + ".", {error: true}); } render(); }
       });
-    }, POLL_MS);
   }
 
-  // ---------------- admin: change passphrase ----------------
-  function wireAdminSettings(){
-    var btn = document.getElementById("adminSettingsBtn");
-    if (!state.auth || state.auth.role !== "admin") { btn.hidden = true; return; }
-    btn.hidden = false;
-    btn.onclick = function(){
-      var next = prompt("New tester passphrase (at least 4 characters):");
-      if (!next) return;
-      api("/api/admin/password", {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({newPassword: next})
-      }).then(function(r){ return r.json().then(function(b){ return {ok: r.ok, body: b}; }); })
-        .then(function(res){
-          alert(res.ok ? "Tester passphrase updated." : (res.body.error || "Could not update."));
-        }).catch(function(){ alert("Could not reach the server."); });
-    };
+  function startPolling(){ stopPolling(); S.pollTimer = setInterval(poll, POLL_MS); }
+  function stopPolling(){ clearInterval(S.pollTimer); S.pollTimer = null; }
+  function poll(){
+    if (document.hidden || !S.auth) return;
+    retryFailedSaves();
+    S.tick++;
+    var view = S.view, appId = S.app, platform = S.platform, p = null;
+    if (view === "cases") p = fetchResults(appId, platform);
+    // The dashboard refreshes every 10s; elsewhere the sidebar catches up every 30s.
+    if ((view === "dashboard" && S.tick % 2 === 0) || S.tick % 6 === 0) {
+      var o = loadOverview();
+      p = p ? Promise.all([p, o]).then(function(r){ return r[0] || r[1]; }) : o;
+    }
+    if (!p) { if (S.dirty && !isTyping() && !activeModal) render(); return; }
+    p.then(function(changed){
+      if (S.view !== view || S.app !== appId || S.platform !== platform) return;
+      if (changed || S.dirty) {
+        if (isTyping() || activeModal) S.dirty = true; else render();
+      }
+    }).catch(function(){});
   }
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden && S.auth) poll(); });
+  window.addEventListener("online", function(){ if (S.auth) poll(); });
 
-  // ---------------- boot ----------------
-  function boot(){
-    document.getElementById("loginScreen").hidden = true;
-    document.getElementById("app").hidden = false;
-    var badge = document.getElementById("roleBadge");
-    badge.textContent = state.auth.role === "admin" ? "admin" : "tester";
-    badge.classList.toggle("admin", state.auth.role === "admin");
-    wireAdminSettings();
-    document.getElementById("logoutBtn").onclick = logout;
-    renderTabs();
-    renderPlatforms();
-    loadApp(state.app);
+  // ===================================================================
+  // saving results (optimistic, with retry)
+  // ===================================================================
+  function saveResult(caseId, patch, appId, platform){
+    appId = appId || S.app; platform = platform || S.platform;
+    var k = rk(appId, platform), sk = k + "|" + caseId;
+    var map = S.results[k] || (S.results[k] = {});
+    var existing = map[caseId];
+    // Only merge onto my own record — never relabel another tester's note as mine.
+    var base = existing && existing.tester === S.tester ? existing : {caseId: caseId, app: appId, platform: platform, tester: S.tester};
+    map[caseId] = Object.assign({}, base, patch, {updatedAt: new Date().toISOString()});
+    var sv = S.saves[sk] || (S.saves[sk] = {pending: {}, state: "idle"});
+    Object.assign(sv.pending, patch);
+    sv.ctx = {caseId: caseId, app: appId, platform: platform, tester: S.tester};
+    flushSave(sk);
   }
-
-  document.getElementById("loginBtn").addEventListener("click", doLogin);
-  document.getElementById("loginPassword").addEventListener("keydown", function(ev){
-    if (ev.key === "Enter") doLogin();
+  function flushSave(sk){
+    var sv = S.saves[sk];
+    if (!sv || sv.inflight || !Object.keys(sv.pending).length) return;
+    var sent = sv.pending;
+    sv.pending = {};
+    sv.inflight = true; sv.state = "saving";
+    updateSaveUI(sk); renderConn();
+    api("/api/results", {method: "POST", body: Object.assign({}, sv.ctx, sent)}).then(function(){
+      sv.inflight = false;
+      if (Object.keys(sv.pending).length) return flushSave(sk);
+      sv.state = "saved"; sv.at = Date.now();
+      setConn("live"); updateSaveUI(sk);
+    }, function(e){
+      sv.inflight = false;
+      sv.pending = Object.assign({}, sent, sv.pending);
+      sv.state = "error"; sv.error = e.message;
+      if (e.network) setConn("offline"); else renderConn();
+      updateSaveUI(sk);
+    });
+  }
+  function retryFailedSaves(){
+    Object.keys(S.saves).forEach(function(sk){ if (S.saves[sk].state === "error") flushSave(sk); });
+  }
+  function updateSaveUI(sk){
+    var nodes = document.querySelectorAll("[data-save]");
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].getAttribute("data-save") === sk) paintSaveState(nodes[i], sk);
+  }
+  function paintSaveState(node, sk){
+    var sv = S.saves[sk];
+    node.innerHTML = ""; node.className = "save-state";
+    if (!sv) return;
+    if (sv.state === "typing") { node.textContent = "Editing…"; return; }
+    if (sv.state === "saving") { node.appendChild(el("span", {class: "spinner"})); node.appendChild(document.createTextNode("Saving…")); return; }
+    if (sv.state === "saved") { node.classList.add("saved"); node.textContent = "✓ Saved " + fmtTime(sv.at); return; }
+    if (sv.state === "error") {
+      node.classList.add("error");
+      node.appendChild(document.createTextNode("Not saved: " + (sv.error || "server error") + " "));
+      node.appendChild(el("button", {class: "link-btn", type: "button", text: "Retry now", onclick: function(){ flushSave(sk); }}));
+    }
+  }
+  window.addEventListener("beforeunload", function(ev){
+    flushAllComments();
+    if (unsavedCount()) { ev.preventDefault(); ev.returnValue = ""; }
   });
 
-  if (state.auth && state.auth.token) {
-    boot();
-  } else {
-    showLogin();
+  var commentTimers = {};
+  function queueComment(caseId, value){
+    var sk = curKey() + "|" + caseId;
+    var sv = S.saves[sk] || (S.saves[sk] = {pending: {}, state: "idle"});
+    sv.state = "typing"; updateSaveUI(sk);
+    clearTimeout(commentTimers[sk] && commentTimers[sk].t);
+    commentTimers[sk] = {caseId: caseId, value: value, app: S.app, platform: S.platform, t: setTimeout(function(){ flushComment(sk); }, 800)};
   }
+  function flushComment(sk){
+    var c = commentTimers[sk]; if (!c) return;
+    clearTimeout(c.t); delete commentTimers[sk];
+    saveResult(c.caseId, {comments: c.value}, c.app, c.platform);
+  }
+  function flushAllComments(){ Object.keys(commentTimers).forEach(flushComment); }
+
+  // ===================================================================
+  // case actions
+  // ===================================================================
+  function setResult(c, key){
+    requireTester(function(){
+      var map = S.results[curKey()] || {};
+      if (statusOf(map, c.id) === key) return;
+      saveResult(c.id, {result: key});
+      render();
+      if (key === "Fail" || key === "Blocked") {
+        var box = document.querySelector('[data-fk="comment:' + c.id + '"]');
+        if (box && !box.value.trim()) box.focus();
+      }
+    });
+  }
+
+  function visibleCases(){
+    var cases = S.cases[S.app] || [];
+    var map = S.results[curKey()] || {};
+    var q = S.query.trim().toLowerCase();
+    return cases.filter(function(c){
+      if (S.filter !== "All" && statusOf(map, c.id) !== S.filter) return false;
+      if (!q) return true;
+      return [c.id, c.scenario, c.module, c.expected, c.steps].join(" ").toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  function openCase(id, opts){
+    opts = opts || {};
+    flushAllComments();
+    var prev = S.openCard;
+    S.openCard = id;
+    if (opts.reveal && id && !visibleCases().some(function(c){ return c.id === id; })) { S.filter = "All"; S.query = ""; }
+    render();
+    if (!id && prev) {
+      var h = document.querySelector('[data-fk="head:' + prev + '"]');
+      if (h) { h.focus({preventScroll: true}); h.scrollIntoView({block: "nearest"}); }
+    }
+  }
+  function stepCase(dir){
+    var list = visibleCases();
+    if (!list.length) return;
+    var i = list.findIndex(function(c){ return c.id === S.openCard; });
+    var j = i === -1 ? (dir > 0 ? 0 : list.length - 1) : i + dir;
+    if (j < 0 || j >= list.length) return;
+    openCase(list[j].id);
+  }
+  function nextUntested(afterId){
+    var cases = S.cases[S.app] || [];
+    var map = S.results[curKey()] || {};
+    var start = afterId ? cases.findIndex(function(c){ return c.id === afterId; }) + 1 : 0;
+    for (var n = 0; n < cases.length; n++) {
+      var c = cases[(start + n) % cases.length];
+      if (statusOf(map, c.id) === "Not run" && c.id !== afterId) return c;
+    }
+    return null;
+  }
+
+  // ===================================================================
+  // screenshots
+  // ===================================================================
+  function fetchImage(id){
+    if (S.imgCache[id]) return Promise.resolve(S.imgCache[id]);
+    return api("/api/attachments/" + id + "/image").then(function(d){
+      var src = "data:" + d.mimeType + ";base64," + d.image;
+      S.imgCache[id] = src; return src;
+    });
+  }
+  function uploadAttachment(caseId, file){
+    if (!file) return;
+    if (!/^image\//.test(file.type || "")) { toast("Only images can be attached (PNG, JPG, HEIC…).", {error: true}); return; }
+    if (file.size > MAX_IMAGE_BYTES) { toast("That image is " + (file.size / 1048576).toFixed(1) + " MB. Attach one under 3 MB.", {error: true}); return; }
+    requireTester(function(){
+      var appId = S.app, platform = S.platform, uk = rk(appId, platform) + "|" + caseId;
+      S.uploads[uk] = (S.uploads[uk] || 0) + 1;
+      render();
+      var reader = new FileReader();
+      function done(){ S.uploads[uk] = Math.max(0, (S.uploads[uk] || 1) - 1); if (S.view === "cases") render(); }
+      reader.onerror = function(){ done(); toast("Couldn't read that file.", {error: true}); };
+      reader.onload = function(){
+        var base64 = String(reader.result).split(",")[1];
+        api("/api/attachments", {method: "POST", body: {
+          caseId: caseId, app: appId, platform: platform, tester: S.tester,
+          image: base64, filename: file.name || "screenshot.png", mimeType: file.type || "image/png"
+        }}).then(function(){
+          toast("Screenshot attached to " + caseId + ".");
+          return loadAttachments(appId, platform);
+        }).catch(function(e){
+          toast("Upload failed: " + e.message, {error: true, action: {label: "Try again", run: function(){ uploadAttachment(caseId, file); }}});
+        }).then(done);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  function confirmDeleteAttachment(a){
+    openModal({
+      title: "Delete this screenshot?",
+      desc: (a.filename || "Screenshot") + " from " + a.caseId + " will be removed for everyone. This can't be undone.",
+      submitLabel: "Delete", danger: true,
+      onSubmit: function(close, setBusy){
+        setBusy(true, "Deleting…");
+        api("/api/attachments/" + a._id, {method: "DELETE"}).then(function(){
+          delete S.imgCache[a._id];
+          return loadAttachments(a.app, a.platform);
+        }).then(function(){ close(); toast("Screenshot deleted."); render(); })
+          .catch(function(e){ setBusy(false); toast("Couldn't delete: " + e.message, {error: true}); });
+      }
+    });
+  }
+  var lightbox = null;
+  function openLightbox(a){
+    closeLightbox();
+    var img = el("img", {alt: a.filename || "Screenshot"});
+    var cap = el("div", {class: "cap"}, [
+      el("span", {class: "spinner"}),
+      el("span", {text: a.caseId + " · " + platLabel(a.platform) + " · " + (a.tester || "") + " · " + timeAgo(a.createdAt)})
+    ]);
+    lightbox = el("div", {class: "overlay lightbox", role: "dialog", "aria-label": "Screenshot preview"}, [
+      el("button", {class: "btn sm close", text: "Close ✕", onclick: closeLightbox}), img, cap
+    ]);
+    lightbox.addEventListener("click", function(ev){ if (ev.target === lightbox || ev.target === img) closeLightbox(); });
+    document.body.appendChild(lightbox);
+    lightbox.querySelector(".close").focus();
+    fetchImage(a._id).then(function(src){ img.src = src; var sp = cap.querySelector(".spinner"); if (sp) sp.remove(); })
+      .catch(function(e){ cap.textContent = "Couldn't load image: " + e.message; });
+  }
+  function closeLightbox(){ if (lightbox) { lightbox.remove(); lightbox = null; } }
+  document.addEventListener("paste", function(ev){
+    if (!S.auth || S.view !== "cases" || !S.openCard || activeModal) return;
+    var items = (ev.clipboardData && ev.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === "file" && /^image\//.test(items[i].type)) {
+        ev.preventDefault();
+        uploadAttachment(S.openCard, items[i].getAsFile());
+        return;
+      }
+    }
+  });
+
+  // ===================================================================
+  // shared view bits
+  // ===================================================================
+  function skeleton(n){
+    var box = el("div");
+    for (var i = 0; i < n; i++) {
+      box.appendChild(el("div", {class: "skel", "aria-hidden": "true"}, [
+        el("i", {style: "width:" + (40 + (i * 13) % 40) + "%"}), el("i", {style: "width:25%;margin-bottom:0"})
+      ]));
+    }
+    return el("div", {role: "status", "aria-label": "Loading"}, [box]);
+  }
+  function stateBox(title, text, action, isErr){
+    return el("div", {class: "empty state-box" + (isErr ? " error" : "")}, [
+      el("strong", {text: title}), text ? el("div", {text: text}) : null,
+      action ? el("button", {class: "btn" + (action.primary ? " primary" : ""), text: action.label, onclick: action.run}) : null
+    ]);
+  }
+
+  // ===================================================================
+  // view: cases
+  // ===================================================================
+  function renderCases(main){
+    var appId = S.app, k = curKey();
+    var cs = S.casesStatus[appId], rs = S.resultsStatus[k];
+    if (cs === "error" || (rs === "error" && !S.results[k])) {
+      main.appendChild(stateBox("Couldn't load " + appLabel(appId),
+        (S.loadError[appId] || S.loadError[k] || "Something went wrong.") + " Your saved results are safe on the server.",
+        {label: "Try again", primary: true, run: loadCases}, true));
+      return;
+    }
+    if (cs !== "ready" || !S.results[k]) { main.appendChild(skeleton(6)); return; }
+    var cases = S.cases[appId];
+    if (!cases.length) {
+      main.appendChild(stateBox("No test cases for " + appLabel(appId) + " yet", "Ask an admin to load them (npm run seed), then refresh this page."));
+      return;
+    }
+    var map = S.results[k];
+    var counts = tally();
+
+    var filterRow = el("div", {class: "filter-row", role: "group", "aria-label": "Filter by result"});
+    FILTERS.forEach(function(f){
+      var n = f === "All" ? counts.total : counts[f];
+      filterRow.appendChild(el("button", {
+        class: "filter-chip", "aria-pressed": String(S.filter === f), "data-fk": "filter:" + f,
+        onclick: function(){ S.filter = f; render(); }
+      }, [f !== "All" ? el("span", {class: "sdot " + CLS[f], "aria-hidden": "true"}) : null, f, el("span", {class: "count", text: String(n)})]));
+    });
+    var search = el("input", {type: "search", placeholder: "Search cases", "aria-label": "Search cases", value: S.query, "data-fk": "search", id: "searchInput"});
+    var searchTimer;
+    search.addEventListener("input", function(){ clearTimeout(searchTimer); searchTimer = setTimeout(function(){ S.query = search.value; render(); }, 150); });
+    search.addEventListener("keydown", function(ev){ if (ev.key === "Escape") { search.value = ""; S.query = ""; search.blur(); render(); } });
+    main.appendChild(el("div", {class: "toolbar"}, [filterRow, el("label", {class: "search"}, [search, el("kbd", {text: "/"})])]));
+
+    main.appendChild(renderNextUp(counts));
+    main.appendChild(renderNotes());
+
+    var list = visibleCases();
+    if (!list.length) {
+      main.appendChild(stateBox("No cases match",
+        (S.query ? "Nothing matches “" + S.query + "”" : "No cases are " + S.filter) + " on " + platLabel(S.platform) + ".",
+        {label: "Clear filters", run: function(){ S.filter = "All"; S.query = ""; render(); }}));
+      return;
+    }
+    var groups = [], byName = {};
+    list.forEach(function(c){
+      var m = c.module || "General";
+      if (!byName[m]) { byName[m] = {name: m, cases: []}; groups.push(byName[m]); }
+      byName[m].cases.push(c);
+    });
+    groups.forEach(function(g){
+      var all = cases.filter(function(c){ return (c.module || "General") === g.name; });
+      var done = all.filter(function(c){ return statusOf(map, c.id) !== "Not run"; }).length;
+      var grid = el("div", {class: "case-grid"});
+      g.cases.forEach(function(c){ grid.appendChild(renderCard(c, map)); });
+      main.appendChild(el("section", {class: "module", "aria-label": g.name}, [
+        el("div", {class: "module-head"}, [el("h2", {text: g.name}), el("span", {class: "mono", text: done + "/" + all.length + " done"})]),
+        grid
+      ]));
+    });
+  }
+
+  function renderNextUp(counts){
+    var remaining = counts.total - counts.done;
+    var other = PLATFORMS.filter(function(p){ return p.id !== S.platform; })[0];
+    if (!remaining) {
+      var issues = counts.Fail + counts.Blocked;
+      var actions = [];
+      if (issues) actions.push(el("button", {class: "btn", text: "Review " + plural(issues, "issue"), onclick: function(){ S.filter = counts.Fail ? "Fail" : "Blocked"; render(); }}));
+      actions.push(el("button", {class: "btn primary", text: "Switch to " + other.label + " →", onclick: function(){ goCases(S.app, other.id); }}));
+      return el("div", {class: "banner done"}, [
+        el("div", {class: "banner-text"}, [
+          el("strong", {text: "All " + counts.total + " cases recorded on " + platLabel(S.platform)}),
+          el("span", {class: "muted", text: counts.Pass + " passed · " + counts.Fail + " failed · " + counts.Blocked + " blocked · " + counts["N/A"] + " N/A"})
+        ]),
+        el("div", {class: "banner-actions"}, actions)
+      ]);
+    }
+    var next = nextUntested(null);
+    return el("div", {class: "banner"}, [
+      el("div", {class: "banner-text"}, [
+        el("strong", {text: remaining + " of " + counts.total + " cases left on " + platLabel(S.platform)}),
+        el("span", {class: "muted", text: "Next up: " + next.id + " — " + next.scenario})
+      ]),
+      el("div", {class: "banner-actions"}, [
+        el("button", {class: "btn primary", "data-fk": "start", text: (counts.done ? "Continue" : "Start testing") + " →", onclick: function(){ openCase(next.id, {reveal: true}); }})
+      ])
+    ]);
+  }
+
+  function renderNotes(){
+    var appId = S.app;
+    var notes = S.comments[appId] || [];
+    var box = el("section", {class: "notes-box"});
+    box.appendChild(el("button", {
+      class: "notes-toggle", "aria-expanded": String(S.notesOpen), "data-fk": "notes-toggle",
+      onclick: function(){ S.notesOpen = !S.notesOpen; render(); }
+    }, [
+      el("span", {class: "notes-title", text: "General notes for " + appLabel(appId)}),
+      el("span", {class: "notes-count", text: S.commentsStatus[appId] === "error" ? "!" : String(notes.length)}),
+      el("span", {class: "chev", "aria-hidden": "true", text: S.notesOpen ? "⌄" : "›"})
+    ]));
+    if (!S.notesOpen) return box;
+    var body = el("div", {class: "notes-body"});
+    var ta = el("textarea", {placeholder: "Anything worth flagging that isn't tied to one case? (build number, device, general crashes…)", "aria-label": "New note", "data-fk": "note-new"});
+    var btn = el("button", {class: "btn primary", type: "button", text: "Post", disabled: true});
+    ta.addEventListener("input", function(){ btn.disabled = !ta.value.trim(); });
+    ta.addEventListener("keydown", function(ev){ if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) btn.click(); });
+    btn.addEventListener("click", function(){
+      var text = ta.value.trim(); if (!text) return;
+      requireTester(function(){
+        btn.disabled = true; ta.disabled = true; btn.textContent = "Posting…";
+        api("/api/comments", {method: "POST", body: {app: appId, tester: S.tester, text: text}})
+          .then(function(){ return loadComments(appId); })
+          .then(function(){ toast("Note posted."); render(); })
+          .catch(function(e){
+            toast("Couldn't post note: " + e.message, {error: true});
+            btn.disabled = false; ta.disabled = false; btn.textContent = "Post";
+          });
+      });
+    });
+    body.appendChild(el("div", {class: "notes-form"}, [ta, btn]));
+    if (S.commentsStatus[appId] === "error") body.appendChild(el("p", {class: "note-row muted", text: "Couldn't load notes. They'll appear when the connection is back."}));
+    else if (!notes.length) body.appendChild(el("p", {class: "note-row muted", text: "No notes yet. Use this for things like the build you're on or issues that span several cases."}));
+    notes.forEach(function(n){
+      body.appendChild(el("div", {class: "note-row"}, [
+        el("div", {class: "note-meta", text: n.tester + " · " + timeAgo(n.createdAt), title: new Date(n.createdAt).toLocaleString()}),
+        el("div", {text: n.text})
+      ]));
+    });
+    box.appendChild(body);
+    return box;
+  }
+
+  function renderCard(c, map){
+    var r = map[c.id] || {};
+    var status = statusOf(map, c.id);
+    var shots = (S.attachments[curKey()] || {})[c.id] || [];
+    var prioHi = /high|critical/i.test(c.priority || "");
+    var metaBits = [c.module];
+    if (shots.length) metaBits.push(plural(shots.length, "screenshot"));
+    if (r.comments) metaBits.push("has note");
+    var card = el("article", {class: "card s-" + CLS[status] + (S.openCard === c.id ? " open" : ""), id: "case-" + c.id});
+    card.appendChild(el("button", {
+      class: "card-head", "aria-haspopup": "dialog", "data-fk": "head:" + c.id,
+      onclick: function(){ openCase(c.id); }
+    }, [
+      el("span", {class: "case-id", text: c.id}),
+      el("span", {class: "case-main"}, [
+        el("span", {class: "case-scenario", text: c.scenario}),
+        el("span", {class: "case-module", text: metaBits.join(" · ")})
+      ]),
+      el("span", {class: "case-right"}, [
+        el("span", {class: "pill " + CLS[status]}, [status]),
+        c.priority ? el("span", {class: "prio" + (prioHi ? " hi" : ""), text: c.priority}) : null
+      ]),
+      el("span", {class: "chev", "aria-hidden": "true", text: "›"})
+    ]));
+    return card;
+  }
+
+  function parseSteps(steps){
+    var lines = String(steps || "").split(/\n+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var numbered = lines.length > 0 && lines.every(function(l){ return /^\d+[.)]\s*/.test(l); });
+    return {numbered: numbered, lines: numbered ? lines.map(function(l){ return l.replace(/^\d+[.)]\s*/, ""); }) : lines};
+  }
+
+  // The case dialog. Rebuilt on every render; scroll + focus are preserved.
+  var lastModalCase = null;
+  function renderCaseModal(){
+    var layer = $("caseLayer");
+    var prevScroll = layer.querySelector(".cm-scroll");
+    var keepScroll = prevScroll && lastModalCase === S.openCard ? prevScroll.scrollTop : 0;
+    layer.innerHTML = "";
+    var c = S.view === "cases" && S.openCard && (S.cases[S.app] || []).filter(function(x){ return x.id === S.openCard; })[0];
+    document.body.classList.toggle("modal-open", !!c);
+    if (!c) { lastModalCase = null; return; }
+    var isNew = lastModalCase !== c.id;
+    lastModalCase = c.id;
+
+    var map = S.results[curKey()] || {};
+    var r = map[c.id] || {};
+    var status = statusOf(map, c.id);
+    var k = curKey(), sk = k + "|" + c.id;
+    var shots = (S.attachments[k] || {})[c.id] || [];
+    var uploading = S.uploads[sk] || 0;
+    var prioHi = /high|critical/i.test(c.priority || "");
+
+    var body = el("div", {class: "cm-body"});
+    var left = el("div"), right = el("div");
+
+    // what to do
+    var st = parseSteps(c.steps);
+    left.appendChild(el("p", {class: "field-label", text: "Steps to follow"}));
+    left.appendChild(el("ol", {class: "steps" + (st.numbered ? "" : " plain")}, st.lines.map(function(l){ return el("li", {text: l}); })));
+    left.appendChild(el("p", {class: "field-label", text: "Expected result"}));
+    left.appendChild(el("p", {class: "expected", text: c.expected}));
+
+    // record the outcome
+    right.appendChild(el("p", {class: "field-label"}, ["Your result on " + platLabel(S.platform)]));
+    var row = el("div", {class: "result-row", role: "group", "aria-label": "Result"});
+    RESULTS.forEach(function(opt){
+      row.appendChild(el("button", {
+        class: "result-btn " + opt.cls, "aria-pressed": String(status === opt.key), title: opt.title + " (" + opt.kb.toUpperCase() + ")",
+        "data-fk": "res:" + c.id + ":" + opt.key, type: "button",
+        onclick: function(){ setResult(c, opt.key); }
+      }, [opt.key, el("kbd", {text: opt.kb.toUpperCase(), "aria-hidden": "true"})]));
+    });
+    right.appendChild(row);
+    right.appendChild(el("div", {class: "result-meta", text: r.tester
+      ? "Last recorded by " + (r.tester === S.tester ? "you" : r.tester) + " · " + timeAgo(r.updatedAt)
+      : "Not recorded yet. Run the steps, then pick a result."}));
+
+    var draft = commentTimers[sk] ? commentTimers[sk].value : (r.comments || "");
+    var wantsNote = status === "Fail" || status === "Blocked";
+    var nudge = null;
+    if (wantsNote) {
+      nudge = el("div", {class: "nudge" + (status === "Blocked" ? " blocked" : ""), hidden: !!draft.trim(), text: status === "Fail"
+        ? "Describe what actually happened so the devs can reproduce it. A screenshot helps too."
+        : "Note what's blocking this case (missing data, crash on an earlier step, no access…)."});
+      right.appendChild(nudge);
+    }
+    right.appendChild(el("p", {class: "field-label"}, [el("label", {for: "cm-" + c.id, text: "Notes"}),
+      r.tester && r.tester !== S.tester && r.comments ? el("span", {class: "hint", text: "written by " + r.tester}) : null]));
+    var ta = el("textarea", {
+      class: "comment-box" + (wantsNote && !draft.trim() ? " want" : ""), id: "cm-" + c.id, "data-fk": "comment:" + c.id,
+      placeholder: status === "Pass" ? "Optional. Anything worth mentioning?" : "What did you see? Include device and app version if relevant."
+    });
+    ta.value = draft;
+    ta.addEventListener("input", function(){
+      if (nudge) { var empty = !ta.value.trim(); nudge.hidden = !empty; ta.classList.toggle("want", empty); }
+      if (!S.tester) { askTester(function(){ queueComment(c.id, ta.value); }); return; }
+      queueComment(c.id, ta.value);
+    });
+    ta.addEventListener("blur", function(){ flushComment(sk); });
+    right.appendChild(ta);
+    var saveNode = el("div", {class: "save-state", "data-save": sk, "aria-live": "polite"});
+    paintSaveState(saveNode, sk);
+    right.appendChild(saveNode);
+
+    // evidence
+    right.appendChild(el("p", {class: "field-label", text: "Screenshots"}));
+    var shotRow = el("div", {class: "shot-row"});
+    shots.forEach(function(a){
+      var img = el("img", {alt: a.filename || "Screenshot"});
+      var ph = el("span", {class: "ph"}, [el("span", {class: "spinner"})]);
+      var thumb = el("div", {class: "shot-thumb", title: (a.tester || "") + " · " + timeAgo(a.createdAt)}, [ph, img,
+        el("button", {class: "rm", type: "button", text: "×", "aria-label": "Delete screenshot " + (a.filename || ""), onclick: function(ev){ ev.stopPropagation(); confirmDeleteAttachment(a); }})
+      ]);
+      img.hidden = true;
+      img.addEventListener("click", function(){ openLightbox(a); });
+      fetchImage(a._id).then(function(src){ img.src = src; img.hidden = false; ph.remove(); })
+        .catch(function(){ ph.textContent = "!"; ph.title = "Couldn't load"; });
+      shotRow.appendChild(thumb);
+    });
+    for (var u = 0; u < uploading; u++) shotRow.appendChild(el("div", {class: "shot-thumb", "aria-label": "Uploading"}, [el("span", {class: "ph"}, [el("span", {class: "spinner"})])]));
+    var fileInput = el("input", {type: "file", accept: "image/*", "aria-label": "Add screenshot"});
+    fileInput.addEventListener("change", function(){ uploadAttachment(c.id, fileInput.files[0]); fileInput.value = ""; });
+    shotRow.appendChild(el("label", {class: "shot-add"}, [el("span", {class: "plus", text: "+"}), el("span", {text: "Add"}), fileInput]));
+    right.appendChild(shotRow);
+    right.appendChild(el("div", {class: "shot-help", text: "Images up to 3 MB. You can also paste a screenshot (Ctrl/⌘+V) while this case is open."}));
+    body.appendChild(el("div", {class: "body-cols"}, [left, right]));
+
+    // move on
+    var list = visibleCases();
+    var idx = list.findIndex(function(x){ return x.id === c.id; });
+    var nextTodo = nextUntested(c.id);
+    var foot = el("div", {class: "cm-foot"}, [
+      el("span", {class: "shortcut-hint"}, [el("kbd", {text: "P"}), el("kbd", {text: "F"}), el("kbd", {text: "B"}), el("kbd", {text: "N"}), " result · ", el("kbd", {text: "J"}), el("kbd", {text: "K"}), " next/prev · ", el("kbd", {text: "?"}), " all shortcuts"]),
+      el("div", {class: "foot-nav"}, [
+        el("button", {class: "btn ghost", type: "button", text: "← Prev", disabled: idx <= 0, onclick: function(){ stepCase(-1); }}),
+        el("button", {class: "btn", type: "button", text: "Next →", disabled: idx === -1 || idx >= list.length - 1, onclick: function(){ stepCase(1); }}),
+        nextTodo && status !== "Not run"
+          ? el("button", {class: "btn primary", type: "button", "data-fk": "next-todo", text: "Next untested: " + nextTodo.id, onclick: function(){ openCase(nextTodo.id, {reveal: true}); }})
+          : null
+      ])
+    ]);
+
+    var head = el("div", {class: "cm-head"}, [
+      el("div", {class: "cm-title"}, [
+        el("div", {class: "cm-kicker"}, [
+          el("span", {class: "mono", text: c.id}), el("span", {text: "·"}), el("span", {text: appLabel(S.app) + " · " + platLabel(S.platform) + " · " + c.module}),
+          c.priority ? el("span", {class: "prio" + (prioHi ? " hi" : ""), text: c.priority}) : null
+        ]),
+        el("h3", {id: "cmTitle", text: c.scenario})
+      ]),
+      el("span", {class: "pill " + CLS[status]}, [status]),
+      el("button", {class: "btn ghost sm cm-close", type: "button", "aria-label": "Close", "data-fk": "cm-close", text: "✕", onclick: function(){ openCase(null); }})
+    ]);
+    var dialog = el("div", {class: "cm", role: "dialog", "aria-modal": "true", "aria-labelledby": "cmTitle"}, [
+      head, el("div", {class: "cm-scroll"}, [body]), foot
+    ]);
+    var overlay = el("div", {class: "overlay case-overlay" + (isNew ? "" : " still")}, [dialog]);
+    overlay.addEventListener("mousedown", function(ev){ if (ev.target === overlay) openCase(null); });
+    layer.appendChild(overlay);
+    if (keepScroll) dialog.querySelector(".cm-scroll").scrollTop = keepScroll;
+    if (isNew) setTimeout(function(){ if (!dialog.contains(document.activeElement)) { var b = dialog.querySelector(".cm-close"); if (b) b.focus({preventScroll: true}); } }, 0);
+  }
+
+  // ===================================================================
+  // view: dashboard
+  // ===================================================================
+  function greeting(){
+    var h = new Date().getHours();
+    var part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    var first = (S.tester || "").split(" ")[0];
+    return part + (first ? ", " + first : "");
+  }
+
+  function renderDashboard(main){
+    if (S.overviewStatus === "error" && !S.overviewAt) {
+      main.appendChild(stateBox("Couldn't load the dashboard", S.loadError.overview, {label: "Try again", primary: true, run: function(){ goView("dashboard"); }}, true));
+      return;
+    }
+    var scope = S.dashPlat;
+    var scopeSeg = el("div", {class: "seg", role: "group", "aria-label": "Platform scope"});
+    [["", "All platforms"], ["ios", "iOS"], ["android", "Android"]].forEach(function(o){
+      scopeSeg.appendChild(el("button", {type: "button", "aria-pressed": String(scope === o[0]), "data-fk": "scope:" + o[0], text: o[1], onclick: function(){ S.dashPlat = o[0]; render(); }}));
+    });
+    var refreshing = S.overviewStatus === "loading";
+    main.appendChild(el("div", {class: "page-head"}, [
+      el("div", {}, [
+        el("h2", {text: greeting()}),
+        el("p", {text: S.overviewAt ? "Here's where testing stands across " + plural(APPS.length, "project") + ". Updated " + fmtTime(S.overviewAt) + "." : "Loading the latest results…"})
+      ]),
+      el("div", {class: "page-actions"}, [scopeSeg,
+        el("button", {class: "btn", type: "button", disabled: refreshing, "data-fk": "dash-refresh", onclick: function(){
+          S.overviewStatus = "loading"; render();
+          loadOverview().then(function(){ toast("Dashboard refreshed."); }, function(e){ toast("Couldn't refresh: " + e.message, {error: true}); }).then(render);
+        }}, refreshing ? [el("span", {class: "spinner"}), "Refreshing"] : ["Refresh"])
+      ])
+    ]));
+    if (!S.overviewAt) { main.appendChild(skeleton(5)); return; }
+
+    // ---- totals
+    var t = {total: 0, done: 0, "Pass": 0, "Fail": 0, "Blocked": 0, "N/A": 0, "Not run": 0};
+    var stats = {};
+    APPS.forEach(function(a){
+      var s = projectStats(a.id, scope); stats[a.id] = s;
+      if (s) ["total", "done", "Pass", "Fail", "Blocked", "N/A", "Not run"].forEach(function(key){ t[key] += s[key]; });
+    });
+    if (!t.total) { main.appendChild(stateBox("No test cases loaded yet", "Run npm run seed to load the test plan, then refresh.")); return; }
+    var pct = Math.round(100 * t.done / t.total);
+    var sk = scope || "all";
+    function kpi(lbl, key, val, sub, cls, dot){
+      return el("div", {class: "kpi " + (cls || "")}, [
+        el("div", {class: "lbl"}, [dot ? el("span", {class: "sdot " + dot}) : null, lbl]),
+        countNode("val", "kpi:" + key + ":" + sk, val), sub ? el("div", {class: "sub", text: sub}) : null
+      ]);
+    }
+    main.appendChild(el("div", {class: "kpis"}, [
+      el("div", {class: "kpi kpi-hero"}, [
+        donut(t, "donut:" + sk),
+        el("div", {class: "hero-txt"}, [
+          el("div", {class: "lbl", text: "Overall progress"}),
+          countNode("val", "kpi:pct:" + sk, pct, "%"),
+          el("div", {class: "sub", text: t.done + " of " + t.total + " runs recorded" + (scope ? " on " + platLabel(scope) : "")}),
+          el("div", {class: "sub", text: t.done ? Math.round(100 * t.Pass / t.done) + "% pass rate" : "No runs yet"})
+        ])
+      ]),
+      kpi("Passed", "pass", t.Pass, "Working as expected", "pass", "pass"),
+      kpi("Failed", "fail", t.Fail, t.Fail ? "Needs a fix" : "None so far", "fail", "fail"),
+      kpi("Blocked", "blocked", t.Blocked, t.Blocked ? "Can't be tested yet" : "None", "blocked", "blocked"),
+      kpi("Not run", "notrun", t["Not run"], "Still to test", "", "notrun")
+    ]));
+
+    // ---- left: projects (cards or table)
+    var left = el("div");
+    var modeSeg = el("div", {class: "seg", role: "group", "aria-label": "Project view"});
+    [["cards", "Cards"], ["table", "Table"]].forEach(function(o){
+      modeSeg.appendChild(el("button", {type: "button", "aria-pressed": String(S.dashMode === o[0]), "data-fk": "mode:" + o[0], text: o[1],
+        onclick: function(){ S.dashMode = o[0]; store.set("uat_dash_mode", o[0]); render(); }}));
+    });
+    left.appendChild(el("div", {class: "section-title"}, [el("span", {text: "Projects"}), modeSeg]));
+    left.appendChild(S.dashMode === "table" ? renderProjectTable(stats, scope) : renderProjectCards(stats, scope));
+
+    // ---- right: work queues
+    var right = el("div");
+    right.appendChild(renderAttention(scope));
+    right.appendChild(renderHighPriority(scope));
+    if (!scope) right.appendChild(renderMismatches());
+    right.appendChild(renderRecent(scope));
+    main.appendChild(el("div", {class: "dash-grid"}, [left, right]));
+  }
+
+  function lastLine(la){
+    if (!la) return el("span", {class: "last", text: "No activity yet"});
+    return el("span", {class: "last"}, ["Last activity: ", el("b", {text: la.tester || "Someone"}), " · " + timeAgo(la.updatedAt)]);
+  }
+
+  function renderProjectCards(stats, scope){
+    var grid = el("div", {class: "app-grid"});
+    APPS.forEach(function(a){
+      var s = stats[a.id];
+      if (!s) return;
+      var card = el("div", {class: "app-card"});
+      card.appendChild(el("div", {class: "app-card-head"}, [
+        el("div", {}, [
+          el("h3", {text: a.label}),
+          el("div", {class: "sub", text: plural((S.cases[a.id] || []).length, "case") + " · " + s.pct + "% done"}),
+          lastLine(lastActivity(a.id, scope))
+        ]),
+        s.issues ? el("span", {class: "pill fail", text: plural(s.issues, "issue")})
+          : s.total && s.done === s.total ? el("span", {class: "pill pass", text: "Complete"})
+          : el("span", {class: "pill notrun", text: s.done ? "In progress" : "Not started"})
+      ]));
+      PLATFORMS.filter(function(p){ return !scope || p.id === scope; }).forEach(function(p){
+        var ps = projectStats(a.id, p.id);
+        card.appendChild(el("button", {
+          class: "plat-row", type: "button", "aria-label": "Open " + a.label + " on " + p.label,
+          onclick: function(){ goCases(a.id, p.id); }
+        }, [
+          el("span", {class: "plat-name", text: p.label}),
+          el("span", {}, [stackedBar(ps, "pr:" + a.id + ":" + p.id), el("span", {class: "plat-stats"}, [
+            el("span", {}, [el("span", {class: "sdot pass"}), ps.Pass + " pass"]),
+            el("span", {style: ps.Fail ? "color:var(--fail)" : null}, [el("span", {class: "sdot fail"}), ps.Fail + " fail"]),
+            el("span", {style: ps.Blocked ? "color:var(--blocked)" : null}, [el("span", {class: "sdot blocked"}), ps.Blocked + " blocked"]),
+            el("span", {}, [el("span", {class: "sdot notrun"}), ps["Not run"] + " left"])
+          ])]),
+          el("span", {class: "plat-pct"}, [ps.pct + "%", el("small", {text: ps.done + "/" + ps.total})])
+        ]));
+      });
+      grid.appendChild(card);
+    });
+    return grid;
+  }
+
+  function renderProjectTable(stats, scope){
+    var rows = APPS.filter(function(a){ return stats[a.id]; }).map(function(a, i){
+      var la = lastActivity(a.id, scope);
+      return {a: a, i: i, s: stats[a.id], ios: projectStats(a.id, "ios"), android: projectStats(a.id, "android"), la: la, last: la ? new Date(la.updatedAt).getTime() : 0};
+    });
+    var get = {
+      name: function(r){ return r.a.label.toLowerCase(); }, ios: function(r){ return r.ios.pct; }, android: function(r){ return r.android.pct; },
+      overall: function(r){ return r.s.pct; }, fail: function(r){ return r.s.Fail; }, blocked: function(r){ return r.s.Blocked; }, last: function(r){ return r.last; }
+    };
+    var sort = S.dashSort;
+    rows.sort(function(x, y){
+      if (!sort.key) return x.i - y.i;
+      var gx = get[sort.key](x), gy = get[sort.key](y);
+      var c = gx < gy ? -1 : gx > gy ? 1 : x.i - y.i;
+      return sort.dir === "asc" ? c : -c;
+    });
+    var cols = [["name", "Project"], ["ios", "iOS"], ["android", "Android"], ["overall", scope ? platLabel(scope) + " total" : "Overall"], ["fail", "Fail"], ["blocked", "Blocked"], ["last", "Last active"]];
+    var head = el("tr", {}, cols.map(function(c){
+      var active = sort.key === c[0];
+      return el("th", {scope: "col", "aria-sort": active ? (sort.dir === "asc" ? "ascending" : "descending") : null}, [
+        el("button", {type: "button", "data-fk": "sort:" + c[0], onclick: function(){
+          if (S.dashSort.key === c[0]) S.dashSort = {key: c[0], dir: S.dashSort.dir === "asc" ? "desc" : "asc"};
+          else S.dashSort = {key: c[0], dir: c[0] === "name" ? "asc" : "desc"};
+          render();
+        }}, [c[1], active ? (sort.dir === "asc" ? " ↑" : " ↓") : ""])
+      ]);
+    }));
+    function barCell(r, plat){
+      var ps = r[plat];
+      return el("td", {}, [el("button", {class: "cell-bar", type: "button", "aria-label": "Open " + r.a.label + " on " + platLabel(plat),
+        onclick: function(ev){ ev.stopPropagation(); goCases(r.a.id, plat); }}, [stackedBar(ps, "tb:" + r.a.id + ":" + plat), el("span", {class: "pct", text: ps.pct + "%"})])]);
+    }
+    function num(n, cls){ return el("td", {class: "num " + (n ? cls : "zero"), text: String(n)}); }
+    var body = el("tbody");
+    rows.forEach(function(r){
+      body.appendChild(el("tr", {onclick: function(){ goCases(r.a.id, scope || S.platform); }}, [
+        el("td", {class: "proj"}, [r.a.label, el("div", {class: "muted-sm", text: plural((S.cases[r.a.id] || []).length, "case")})]),
+        barCell(r, "ios"), barCell(r, "android"),
+        el("td", {}, [el("span", {class: "num", text: r.s.pct + "%"}), el("div", {class: "muted-sm", text: r.s.done + "/" + r.s.total + " runs"})]),
+        num(r.s.Fail, "fail"), num(r.s.Blocked, "blocked"),
+        r.la ? el("td", {class: "muted-sm"}, [el("div", {style: "color:var(--fg);font-weight:600", text: String(r.la.tester || "Someone").split(" ")[0]}), timeAgo(r.la.updatedAt)])
+             : el("td", {class: "muted-sm", text: "—"})
+      ]));
+    });
+    return el("div", {class: "table-wrap"}, [el("table", {class: "htable"}, [el("thead", {}, [head]), body])]);
+  }
+
+  function panel(title, items, emptyText, extra){
+    var count = items.length;
+    var box = el("section", {class: "panel"}, [el("div", {class: "panel-head"}, [
+      el("h3", {text: title}), extra || (count ? el("span", {class: "sb-badge" + (extra === false ? " ok" : ""), text: String(count)}) : null)
+    ])]);
+    if (!count) { box.appendChild(el("div", {class: "panel-empty", text: emptyText})); return box; }
+    var list = el("div");
+    items.slice(0, 6).forEach(function(n){ list.appendChild(n()); });
+    box.appendChild(list);
+    if (count > 6) box.appendChild(el("div", {class: "panel-more", text: "+ " + (count - 6) + " more"}));
+    return box;
+  }
+
+  function renderAttention(scope){
+    var items = [];
+    APPS.forEach(function(a){
+      var byId = {};
+      (S.cases[a.id] || []).forEach(function(c){ byId[c.id] = c; });
+      PLATFORMS.forEach(function(p){
+        if (scope && p.id !== scope) return;
+        var map = S.results[rk(a.id, p.id)] || {};
+        Object.keys(map).forEach(function(id){
+          var st = statusOf(map, id);
+          if (byId[id] && (st === "Fail" || st === "Blocked")) items.push({app: a.id, platform: p.id, c: byId[id], r: map[id], status: st});
+        });
+      });
+    });
+    items.sort(function(x, y){ return (x.status === "Fail" ? 0 : 1) - (y.status === "Fail" ? 0 : 1) || new Date(y.r.updatedAt) - new Date(x.r.updatedAt); });
+    return panel("Needs attention", items.map(function(it){ return function(){
+      return el("button", {class: "feed-item", type: "button", onclick: function(){ goToCase(it.app, it.platform, it.c.id); }}, [
+        el("span", {class: "pill " + CLS[it.status], text: it.status}),
+        el("span", {class: "body"}, [
+          el("span", {class: "title", text: it.c.scenario}),
+          el("span", {class: "meta", text: it.c.id + " · " + appLabel(it.app) + " · " + platLabel(it.platform) + " · " + timeAgo(it.r.updatedAt)}),
+          el("span", {class: "note", text: (it.r.comments || "").trim() || "No details yet. Add a note so devs can reproduce it."})
+        ])
+      ]);
+    }; }), "No failed or blocked cases right now.");
+  }
+
+  function renderHighPriority(scope){
+    var items = [];
+    APPS.forEach(function(a){
+      (S.cases[a.id] || []).forEach(function(c){
+        if (!/^(critical|high)$/i.test(String(c.priority || "").trim())) return;
+        var missing = PLATFORMS.filter(function(p){ return (!scope || p.id === scope) && statusOf(S.results[rk(a.id, p.id)], c.id) === "Not run"; });
+        if (missing.length) items.push({app: a.id, c: c, missing: missing, crit: /critical/i.test(c.priority)});
+      });
+    });
+    items.sort(function(x, y){ return (y.crit ? 1 : 0) - (x.crit ? 1 : 0); });
+    return panel("High priority, not run", items.map(function(it){ return function(){
+      return el("button", {class: "feed-item", type: "button", onclick: function(){ goToCase(it.app, it.missing[0].id, it.c.id); }}, [
+        el("span", {class: "tag " + (it.crit ? "crit" : "high"), text: it.crit ? "Critical" : "High"}),
+        el("span", {class: "body"}, [
+          el("span", {class: "title", text: it.c.scenario}),
+          el("span", {class: "meta", text: it.c.id + " · " + appLabel(it.app) + " · not run on " + it.missing.map(function(p){ return p.label; }).join(" + ")})
+        ])
+      ]);
+    }; }), "Every Critical and High case has been run" + (scope ? " on " + platLabel(scope) : "") + ".");
+  }
+
+  function renderMismatches(){
+    var items = [];
+    function bad(x){ return x === "Fail" || x === "Blocked"; }
+    APPS.forEach(function(a){
+      var mi = S.results[rk(a.id, "ios")] || {}, ma = S.results[rk(a.id, "android")] || {};
+      (S.cases[a.id] || []).forEach(function(c){
+        var si = statusOf(mi, c.id), sa = statusOf(ma, c.id);
+        if ((si === "Pass" && bad(sa)) || (sa === "Pass" && bad(si))) items.push({app: a.id, c: c, si: si, sa: sa, failOn: bad(si) ? "ios" : "android"});
+      });
+    });
+    return panel("Platform mismatches", items.map(function(it){ return function(){
+      return el("button", {class: "feed-item", type: "button", onclick: function(){ goToCase(it.app, it.failOn, it.c.id); }}, [
+        el("span", {class: "body"}, [
+          el("span", {class: "title", text: it.c.scenario}),
+          el("span", {class: "meta", text: it.c.id + " · " + appLabel(it.app)}),
+          el("span", {class: "pair"}, [
+            el("span", {class: "pill " + CLS[it.si], text: "iOS " + it.si}),
+            el("span", {class: "pill " + CLS[it.sa], text: "Android " + it.sa})
+          ])
+        ])
+      ]);
+    }; }), "iOS and Android agree on every case tested on both. A pass on one platform with a fail on the other will show here.");
+  }
+
+  function renderRecent(scope){
+    var items = [];
+    APPS.forEach(function(a){
+      var byId = {};
+      (S.cases[a.id] || []).forEach(function(c){ byId[c.id] = c; });
+      PLATFORMS.forEach(function(p){
+        if (scope && p.id !== scope) return;
+        var map = S.results[rk(a.id, p.id)] || {};
+        Object.keys(map).forEach(function(id){
+          var st = statusOf(map, id);
+          if (byId[id] && st !== "Not run" && map[id].updatedAt) items.push({app: a.id, platform: p.id, c: byId[id], r: map[id], status: st});
+        });
+      });
+    });
+    items.sort(function(x, y){ return new Date(y.r.updatedAt) - new Date(x.r.updatedAt); });
+    var link = isAdmin() ? el("button", {class: "link-btn", type: "button", style: "font-size:12px", text: "Full history", onclick: function(){ goView("history"); }}) : null;
+    return panel("Recent activity", items.map(function(it){ return function(){
+      return el("button", {class: "feed-item", type: "button", onclick: function(){ goToCase(it.app, it.platform, it.c.id); }}, [
+        el("span", {class: "avatar sm alt", text: initials(it.r.tester), "aria-hidden": "true"}),
+        el("span", {class: "body"}, [
+          el("span", {class: "title", text: (it.r.tester || "Someone") + " marked " + it.c.id + " " + it.status}),
+          el("span", {class: "meta", text: appLabel(it.app) + " · " + platLabel(it.platform) + " · " + timeAgo(it.r.updatedAt)}),
+          el("span", {class: "note", text: it.c.scenario})
+        ]),
+        el("span", {class: "pill " + CLS[it.status], text: it.status})
+      ]);
+    }; }), "No results recorded yet. Pick a project to start testing.", link);
+  }
+
+  // ===================================================================
+  // view: history (admin)
+  // ===================================================================
+  function loadHistory(){
+    S.historyStatus = S.history ? "refreshing" : "loading";
+    var f = S.historyFilter, qs = [];
+    if (f.app) qs.push("app=" + encodeURIComponent(f.app));
+    if (f.platform) qs.push("platform=" + encodeURIComponent(f.platform));
+    var want = JSON.stringify([f.app, f.platform]);
+    api("/api/admin/history" + (qs.length ? "?" + qs.join("&") : "")).then(function(rows){
+      if (want !== JSON.stringify([S.historyFilter.app, S.historyFilter.platform])) return;
+      S.history = rows || []; S.historyStatus = "ready";
+    }).catch(function(e){ S.historyStatus = "error"; S.loadError.history = e.message; })
+      .then(function(){ if (S.view === "history") render(); });
+  }
+
+  function renderHistory(main){
+    var f = S.historyFilter;
+    var appSel = el("select", {class: "select", "aria-label": "Project", "data-fk": "h-app", onchange: function(){ f.app = appSel.value; S.history = null; loadHistory(); render(); }},
+      [el("option", {value: "", text: "All projects"})].concat(APPS.map(function(a){ return el("option", {value: a.id, text: a.label}); })));
+    appSel.value = f.app;
+    var platSel = el("select", {class: "select", "aria-label": "Platform", "data-fk": "h-plat", onchange: function(){ f.platform = platSel.value; S.history = null; loadHistory(); render(); }},
+      [el("option", {value: "", text: "All platforms"})].concat(PLATFORMS.map(function(p){ return el("option", {value: p.id, text: p.label}); })));
+    platSel.value = f.platform;
+    var q = el("input", {class: "select", type: "search", placeholder: "Filter by tester or case", "aria-label": "Filter by tester or case", value: f.q, "data-fk": "h-q"});
+    var qt; q.addEventListener("input", function(){ clearTimeout(qt); qt = setTimeout(function(){ f.q = q.value; render(); }, 150); });
+    var refreshing = S.historyStatus === "refreshing" || S.historyStatus === "loading";
+    main.appendChild(el("div", {class: "page-head"}, [
+      el("div", {}, [el("p", {text: "The latest 300 changes. Click a case to open it."})]),
+      el("div", {class: "page-actions"}, [appSel, platSel, q,
+        el("button", {class: "btn", type: "button", disabled: refreshing, onclick: function(){ loadHistory(); render(); }, "data-fk": "h-refresh"}, refreshing ? [el("span", {class: "spinner"}), "Refreshing"] : ["Refresh"])])
+    ]));
+    if (S.historyStatus === "error" && !S.history) {
+      main.appendChild(stateBox("Couldn't load history", S.loadError.history, {label: "Try again", primary: true, run: function(){ loadHistory(); render(); }}, true));
+      return;
+    }
+    if (!S.history) { main.appendChild(skeleton(6)); return; }
+    var needle = f.q.trim().toLowerCase();
+    var rows = S.history.filter(function(h){ return !needle || ((h.tester || "") + " " + (h.caseId || "")).toLowerCase().indexOf(needle) !== -1; });
+    if (!rows.length) {
+      main.appendChild(stateBox(S.history.length ? "No changes match" : "No changes yet",
+        S.history.length ? "Try a different filter." : "Results and notes will appear here as testers record them."));
+      return;
+    }
+    var day = null, list = null;
+    rows.forEach(function(h){
+      var d = dayLabel(h.changedAt);
+      if (d !== day) {
+        day = d; main.appendChild(el("div", {class: "history-day", text: d}));
+        list = el("div", {class: "history-list"}); main.appendChild(list);
+      }
+      var res = h.result && CLS[h.result] ? h.result : null;
+      list.appendChild(el("div", {class: "history-row"}, [
+        el("span", {class: "time", text: fmtTime(h.changedAt), title: new Date(h.changedAt).toLocaleString()}),
+        el("span", {class: "pillcell"}, [el("span", {class: "pill " + (res ? CLS[res] : "notrun"), text: res || "Note"})]),
+        el("div", {class: "what"}, [
+          el("div", {}, [
+            el("button", {class: "link-btn mono", type: "button", text: h.caseId, onclick: function(){ goToCase(h.app, h.platform, h.caseId); }}),
+            el("span", {class: "muted", text: " · " + appLabel(h.app) + " · " + platLabel(h.platform) + " · by "}),
+            el("strong", {text: h.tester || "unknown"})
+          ]),
+          h.comments ? el("div", {class: "comment", text: h.comments}) : null
+        ])
+      ]));
+    });
+  }
+
+  // ===================================================================
+  // keyboard
+  // ===================================================================
+  function showShortcuts(){
+    var rows = [["P F B N", "Mark the open case Pass / Fail / Blocked / N/A"], ["J K", "Open next / previous case"], ["Enter", "Open the focused case"],
+      ["Esc", "Close the case, dialog or image"], ["/", "Search cases"], ["⌘/Ctrl V", "Paste a screenshot into the open case"], ["?", "Show this list"]];
+    var list = el("div", {class: "kb-list"});
+    rows.forEach(function(r){
+      list.appendChild(el("span", {}, r[0].split(" ").map(function(k){ return el("kbd", {text: k}); })));
+      list.appendChild(el("span", {text: r[1]}));
+    });
+    openModal({title: "Keyboard shortcuts", body: [list], submitLabel: "Got it", cancelLabel: "Close", onSubmit: function(close){ close(); }});
+  }
+
+  document.addEventListener("keydown", function(ev){
+    if (ev.key === "Tab") {
+      var top = lightbox || (activeModal && activeModal.node) || document.querySelector("#caseLayer .cm") || (S.sidebarOpen && isDrawer() && $("sidebar"));
+      if (top) {
+        var f = Array.prototype.filter.call(top.querySelectorAll("button, [href], input, textarea, select, [tabindex]:not([tabindex='-1'])"), function(n){ return !n.disabled && n.offsetParent !== null; });
+        if (f.length) {
+          var first = f[0], last = f[f.length - 1];
+          if (!top.contains(document.activeElement)) { ev.preventDefault(); first.focus(); }
+          else if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+          else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+        }
+      }
+      return;
+    }
+    if (ev.key === "Escape") {
+      if (lightbox) { closeLightbox(); return; }
+      if (activeModal) { if (activeModal.dismissable) closeModal(); return; }
+      if (S.view === "cases" && S.openCard) {
+        if (isTyping()) { document.activeElement.blur(); return; }
+        openCase(null); return;
+      }
+      if (S.sidebarOpen) { setSidebar(false); $("menuBtn").focus(); return; }
+    }
+    if (!S.auth || activeModal || lightbox || isTyping() || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (ev.key === "?") { ev.preventDefault(); showShortcuts(); return; }
+    if (S.view !== "cases") return;
+    if (ev.key === "/") { var s = $("searchInput"); if (s && !S.openCard) { ev.preventDefault(); s.focus(); } return; }
+    var key = ev.key.toLowerCase();
+    if (key === "j") { ev.preventDefault(); stepCase(1); return; }
+    if (key === "k") { ev.preventDefault(); stepCase(-1); return; }
+    if (S.openCard) {
+      var opt = RESULTS.filter(function(o){ return o.kb === key; })[0];
+      if (opt) {
+        var c = (S.cases[S.app] || []).filter(function(x){ return x.id === S.openCard; })[0];
+        if (c) { ev.preventDefault(); setResult(c, opt.key); }
+      }
+    }
+  });
+
+  // ===================================================================
+  // boot
+  // ===================================================================
+  function boot(){
+    $("loginScreen").hidden = true;
+    $("app").hidden = false;
+    var savedView = store.get("uat_view");
+    setConn("syncing");
+    startPolling();
+    // One request pair fills the sidebar and dashboard for every project.
+    loadOverview().catch(function(){}).then(function(){ if (S.auth && S.view !== "cases") render(); else if (S.auth) renderSidebar(); });
+    var route = parseRoute(location.hash);
+    if (route) { S.view = "dashboard"; applyRoute(route); }
+    else if (savedView === "cases") goCases(S.app, S.platform);
+    else { S.view = savedView === "history" && isAdmin() ? "history" : "dashboard"; if (S.view === "history") loadHistory(); render(); }
+    api("/api/me").then(function(me){
+      if (me && me.role && S.auth && me.role !== S.auth.role) {
+        S.auth.role = me.role; store.set("uat_auth", JSON.stringify(S.auth));
+        if (!isAdmin() && S.view === "history") goView("dashboard"); else render();
+      }
+    }).catch(function(){});
+    if (!S.tester) askTester();
+  }
+
+  applyTheme();
+  $("menuBtn").appendChild(icon("menu"));
+  $("logoutBtn").insertBefore(icon("logout"), $("logoutBtn").firstChild);
+  $("adminSettingsBtn").insertBefore(icon("lock"), $("adminSettingsBtn").firstChild);
+  $("loginForm").addEventListener("submit", doLogin);
+  $("pwToggle").addEventListener("click", function(){
+    var i = $("loginPassword"), show = i.type === "password";
+    i.type = show ? "text" : "password";
+    this.textContent = show ? "Hide" : "Show";
+    this.setAttribute("aria-pressed", String(show));
+    i.focus();
+  });
+  $("logoutBtn").addEventListener("click", logout);
+  $("adminSettingsBtn").addEventListener("click", openPassphraseModal);
+  $("whoBtn").addEventListener("click", function(){ flushAllComments(); askTester(); });
+  $("menuBtn").addEventListener("click", function(){ setSidebar(true); });
+  $("sbClose").addEventListener("click", function(){ setSidebar(false); $("menuBtn").focus(); });
+  $("sbScrim").addEventListener("click", function(){ setSidebar(false); });
+  window.addEventListener("resize", function(){ if (!isDrawer() && S.sidebarOpen) setSidebar(false); });
+  setInterval(function(){ if (S.auth) S.dirty = true; }, 60000);   // keep "x min ago" labels fresh
+
+  if (S.auth && S.auth.token) boot(); else showLogin("");
 })();
 </script>
 </body>

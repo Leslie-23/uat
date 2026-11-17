@@ -52,6 +52,7 @@ function requireRole(minRole) {
         return res.status(403).json({ error: 'admin_only' });
       }
       req.role = session.role;
+      req.token = token;
       next();
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -86,6 +87,20 @@ app.post('/api/auth', async (req, res) => {
 
 // Everything below this line needs at least a tester session.
 app.use('/api', requireRole('tester'));
+
+// Lets the client confirm a stored session is still valid (and its role).
+app.get('/api/me', (req, res) => res.json({ role: req.role }));
+
+// Ends the current session server-side.
+app.post('/api/logout', async (req, res) => {
+  try {
+    const db = await getDb();
+    await db.collection('sessions').deleteOne({ _id: req.token });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('/api/testcases', async (req, res) => {
   try {
