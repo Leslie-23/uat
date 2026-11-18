@@ -1045,6 +1045,7 @@
     var active = 0;
     APPS.forEach(function(a){
       var s = projectStats(a.id);
+      var iosS = projectStats(a.id, "ios"), andS = projectStats(a.id, "android");
       if (s && s.done) active++;
       var current = S.view === "cases" && S.app === a.id;
       list.appendChild(el("button", {
@@ -1059,7 +1060,7 @@
         ]),
         stackedBar(s, "sb:" + a.id),
         el("span", {class: "meta"}, [
-          el("span", {text: s ? s.done + "/" + s.total + " runs" : "Loading…"}),
+          el("span", {text: s ? "iOS: " + (iosS ? iosS.done : 0) + ", Android: " + (andS ? andS.done : 0) : "Loading…"}),
           el("span", {text: s ? s.pct + "%" : ""})
         ])
       ]));
