@@ -138,6 +138,30 @@ app.get('/api/results', async (req, res) => {
 const PLATFORMS = ['ios', 'android'];
 function slug(s){ return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'anon'; }
 
+// A case+platform an admin has accepted is frozen for everyone — including
+// admins going through the normal submit routes — until it's reopened.
+// That's the whole point: no more "went back in and changed it by mistake".
+function acceptanceId(appId, caseId, platform){ return `${appId}__${caseId}__${platform}`; }
+async function isLocked(db, appId, caseId, platform){
+  const doc = await db.collection('acceptances').findOne({ _id: acceptanceId(appId, caseId, platform) });
+  return !!(doc && doc.accepted);
+}
+
+// GET /api/acceptances — which case+platform combos are locked. Readable
+// by testers too, so the UI can show them as locked/read-only.
+app.get('/api/acceptances', async (req, res) => {
+  try {
+    const db = await getDb();
+    const filter = {};
+    if (req.query.app) filter.app = req.query.app;
+    if (req.query.platform) filter.platform = req.query.platform;
+    const docs = await db.collection('acceptances').find(filter).toArray();
+    res.json(docs);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/results  { caseId, app, platform, tester, result?, comments? }
 // `platform` is required — the same case can hold an independent outcome
 // per platform, so it's part of the document's identity, not optional.
@@ -151,6 +175,9 @@ app.post('/api/results', async (req, res) => {
       return res.status(400).json({ error: `platform must be one of: ${PLATFORMS.join(', ')}` });
     }
     const db = await getDb();
+    if (await isLocked(db, appId, caseId, platform)) {
+      return res.status(423).json({ error: 'An admin has accepted and locked this case. Ask them to reopen it before recording a new result.' });
+    }
     const docId = `${caseId}__${platform}__${slug(tester)}`;
     const now = new Date();
     const patch = { caseId, app: appId, platform, tester, updatedAt: now };
@@ -207,6 +234,9 @@ app.post('/api/attachments', async (req, res) => {
       return res.status(413).json({ error: 'Image too large — please attach a smaller screenshot (under ~3MB).' });
     }
     const db = await getDb();
+    if (await isLocked(db, appId, caseId, platform)) {
+      return res.status(423).json({ error: 'An admin has accepted and locked this case. Ask them to reopen it before adding a screenshot.' });
+    }
     const doc = {
       caseId, app: appId, platform, tester, image, filename: filename || 'screenshot.png',
       mimeType: mimeType || 'image/png', createdAt: new Date(), ...clientInfo(req),
@@ -221,6 +251,10 @@ app.post('/api/attachments', async (req, res) => {
 app.delete('/api/attachments/:id', async (req, res) => {
   try {
     const db = await getDb();
+    const doc = await db.collection('attachments').findOne({ _id: new ObjectId(req.params.id) });
+    if (doc && await isLocked(db, doc.app, doc.caseId, doc.platform)) {
+      return res.status(423).json({ error: 'An admin has accepted and locked this case. Ask them to reopen it before removing a screenshot.' });
+    }
     await db.collection('attachments').deleteOne({ _id: new ObjectId(req.params.id) });
     res.json({ ok: true });
   } catch (e) {
@@ -268,6 +302,49 @@ app.post('/api/admin/password', async (req, res) => {
     await db.collection('settings').updateOne(
       { _id: 'global' },
       { $set: { accessPassword: newPassword, updatedAt: new Date() } },
+      { upsert: true }
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/accept  { app, caseId, platform }
+// Locks that case+platform: no tester (or admin, via the normal routes)
+// can change its result, comments, or screenshots until it's reopened.
+app.post('/api/admin/accept', async (req, res) => {
+  try {
+    const { app: appId, caseId, platform } = req.body || {};
+    if (!appId || !caseId || !platform) {
+      return res.status(400).json({ error: 'app, caseId, and platform are required' });
+    }
+    if (!PLATFORMS.includes(platform)) {
+      return res.status(400).json({ error: `platform must be one of: ${PLATFORMS.join(', ')}` });
+    }
+    const db = await getDb();
+    await db.collection('acceptances').updateOne(
+      { _id: acceptanceId(appId, caseId, platform) },
+      { $set: { app: appId, caseId, platform, accepted: true, acceptedAt: new Date() }, $unset: { reopenedAt: '' } },
+      { upsert: true }
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/reopen  { app, caseId, platform }
+app.post('/api/admin/reopen', async (req, res) => {
+  try {
+    const { app: appId, caseId, platform } = req.body || {};
+    if (!appId || !caseId || !platform) {
+      return res.status(400).json({ error: 'app, caseId, and platform are required' });
+    }
+    const db = await getDb();
+    await db.collection('acceptances').updateOne(
+      { _id: acceptanceId(appId, caseId, platform) },
+      { $set: { app: appId, caseId, platform, accepted: false, reopenedAt: new Date() } },
       { upsert: true }
     );
     res.json({ ok: true });

@@ -290,9 +290,17 @@
   .result-btn[aria-pressed="true"].blocked{background:var(--blocked-bg);color:var(--blocked);border-color:var(--blocked)}
   .result-btn[aria-pressed="true"].na{background:var(--na-bg);color:var(--na);border-color:var(--na)}
   .result-btn[aria-pressed="true"] kbd{border-color:currentColor;color:inherit}
+  .result-btn:disabled{opacity:.6;cursor:not-allowed}
   .result-meta{font-size:11.5px;color:var(--fg-muted);margin-top:8px;min-height:16px}
   .nudge{font-size:12px;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--fail-bg);color:var(--fail)}
   .nudge.blocked{background:var(--blocked-bg);color:var(--blocked)}
+  .lock-banner{display:flex;align-items:center;gap:8px;font-size:12px;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface-2);color:var(--fg-muted);border:1px solid var(--border)}
+  .lock-banner .ico{width:14px;height:14px;flex:0 0 auto;color:var(--accent)}
+  .lock-banner strong{color:var(--fg)}
+  .lock-banner button{margin-left:auto;flex:0 0 auto}
+  .lock-banner.idle{color:var(--fg-muted)}
+  .lock-ico{display:inline-flex;width:13px;height:13px;color:var(--fg-muted)}
+  .lock-ico .ico{width:100%;height:100%}
   .comment-box{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical;min-height:72px;display:block}
   .comment-box:focus{outline:2px solid var(--accent);outline-offset:-1px}
   .comment-box.want{border-color:var(--fail)}
@@ -579,6 +587,7 @@
     results: {}, resultsStatus: {},      // by app|platform → {caseId: latest result doc}
     overviewStatus: "idle", overviewAt: null,
     attachments: {},                     // by app|platform → {caseId: [meta]}
+    accepted: {},                        // by app|platform → {caseId: acceptance doc}
     comments: {}, commentsStatus: {},    // by app
     saves: {},                           // by app|platform|caseId → {state, pending, inflight}
     uploads: {},                         // by app|platform|caseId → count in flight
@@ -595,6 +604,10 @@
   function appLabel(id){ for (var i = 0; i < APPS.length; i++) if (APPS[i].id === id) return APPS[i].label; return id; }
   function platLabel(id){ return id === "android" ? "Android" : id === "ios" ? "iOS" : (id || "—"); }
   function isAdmin(){ return !!(S.auth && S.auth.role === "admin"); }
+  function isLocked(appId, platform, caseId){
+    var a = (S.accepted[rk(appId, platform)] || {})[caseId];
+    return !!(a && a.accepted);
+  }
 
   // ===================================================================
   // theme
@@ -1254,10 +1267,35 @@
     return changed;
   }
 
+  // Which cases are admin-accepted (locked). One doc per app|caseId|platform,
+  // not per-tester like results — there's exactly one lock state to track.
+  function acceptSignature(map){
+    return Object.keys(map || {}).sort().map(function(id){
+      var a = map[id]; return id + ":" + (a.accepted ? 1 : 0);
+    }).join("|");
+  }
+  function ingestAcceptances(rows, keys){
+    var fresh = {};
+    keys.forEach(function(k){ fresh[k] = {}; });
+    (rows || []).forEach(function(row){
+      if (!row.caseId) return;
+      var bucket = fresh[rk(row.app, row.platform)];
+      if (!bucket) return;
+      bucket[row.caseId] = row;
+    });
+    var changed = false;
+    keys.forEach(function(k){
+      var prev = S.accepted[k] || {};
+      if (acceptSignature(prev) !== acceptSignature(fresh[k])) changed = true;
+      S.accepted[k] = fresh[k];
+    });
+    return changed;
+  }
+
   // Everything, for the dashboard and sidebar: all cases + all results.
   function loadOverview(){
     if (S.overviewStatus !== "ready") S.overviewStatus = "loading";
-    return Promise.all([api("/api/testcases"), api("/api/results")]).then(function(res){
+    return Promise.all([api("/api/testcases"), api("/api/results"), api("/api/acceptances")]).then(function(res){
       var byApp = {};
       APPS.forEach(function(a){ byApp[a.id] = []; });
       (res[0] || []).forEach(function(c){ if (byApp[c.app]) byApp[c.app].push(c); });
@@ -1270,6 +1308,7 @@
       var keys = [];
       APPS.forEach(function(a){ PLATFORMS.forEach(function(p){ keys.push(rk(a.id, p.id)); }); });
       var changed = ingestResults(res[1], keys) || casesChanged || !S.overviewAt;
+      changed = ingestAcceptances(res[2], keys) || changed;
       S.overviewStatus = "ready"; S.overviewAt = Date.now();
       setConn("live");
       return changed;
@@ -1283,8 +1322,10 @@
 
   function fetchResults(appId, platform){
     var k = rk(appId, platform);
-    return api("/api/results?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform)).then(function(rows){
-      var changed = ingestResults(rows, [k]);
+    var qs = "?app=" + encodeURIComponent(appId) + "&platform=" + encodeURIComponent(platform);
+    return Promise.all([api("/api/results" + qs), api("/api/acceptances" + qs)]).then(function(res){
+      var changed = ingestResults(res[0], [k]);
+      changed = ingestAcceptances(res[1], [k]) || changed;
       setConn("live");
       return changed;
     }).catch(function(e){
@@ -1434,6 +1475,7 @@
   // case actions
   // ===================================================================
   function setResult(c, key){
+    if (isLocked(S.app, S.platform, c.id)) return;
     requireTester(function(){
       var map = S.results[curKey()] || {};
       if (statusOf(map, c.id) === key) return;
@@ -1444,6 +1486,26 @@
         if (box && !box.value.trim()) box.focus();
       }
     });
+  }
+
+  // admin: lock/unlock a case+platform so testers can't change it by mistake
+  function acceptCase(c){
+    if (!isAdmin()) return;
+    var appId = S.app, platform = S.platform, k = rk(appId, platform);
+    api("/api/admin/accept", {method: "POST", body: {app: appId, caseId: c.id, platform: platform}}).then(function(){
+      (S.accepted[k] || (S.accepted[k] = {}))[c.id] = {app: appId, caseId: c.id, platform: platform, accepted: true, acceptedAt: new Date().toISOString()};
+      toast("Accepted and locked " + c.id + ".");
+      render();
+    }).catch(function(e){ toast(e.message || "Couldn't accept this case.", {error: true}); });
+  }
+  function reopenCase(c){
+    if (!isAdmin()) return;
+    var appId = S.app, platform = S.platform, k = rk(appId, platform);
+    api("/api/admin/reopen", {method: "POST", body: {app: appId, caseId: c.id, platform: platform}}).then(function(){
+      (S.accepted[k] || (S.accepted[k] = {}))[c.id] = {app: appId, caseId: c.id, platform: platform, accepted: false};
+      toast("Reopened " + c.id + " for editing.");
+      render();
+    }).catch(function(e){ toast(e.message || "Couldn't reopen this case.", {error: true}); });
   }
 
   function visibleCases(){
@@ -1500,6 +1562,7 @@
   }
   function uploadAttachment(caseId, file){
     if (!file) return;
+    if (isLocked(S.app, S.platform, caseId)) { toast("This case is accepted and locked. Ask an admin to reopen it first.", {error: true}); return; }
     if (!/^image\//.test(file.type || "")) { toast("Only images can be attached (PNG, JPG, HEIC…).", {error: true}); return; }
     if (file.size > MAX_IMAGE_BYTES) { toast("That image is " + (file.size / 1048576).toFixed(1) + " MB. Attach one under 3 MB.", {error: true}); return; }
     requireTester(function(){
@@ -1728,6 +1791,7 @@
     var status = statusOf(map, c.id);
     var shots = (S.attachments[curKey()] || {})[c.id] || [];
     var prioHi = /high|critical/i.test(c.priority || "");
+    var locked = isLocked(S.app, S.platform, c.id);
     var metaBits = [c.module];
     if (shots.length) metaBits.push(plural(shots.length, "screenshot"));
     if (r.comments) metaBits.push("has note");
@@ -1742,7 +1806,10 @@
         el("span", {class: "case-module", text: metaBits.join(" · ")})
       ]),
       el("span", {class: "case-right"}, [
-        el("span", {class: "pill " + CLS[status]}, [status]),
+        el("span", {style: "display:flex;align-items:center;gap:5px"}, [
+          locked ? el("span", {class: "lock-ico", title: "Accepted — locked"}, [icon("lock")]) : null,
+          el("span", {class: "pill " + CLS[status]}, [status])
+        ]),
         c.priority ? el("span", {class: "prio" + (prioHi ? " hi" : ""), text: c.priority}) : null
       ]),
       el("span", {class: "chev", "aria-hidden": "true", text: "›"})
@@ -1776,6 +1843,8 @@
     var shots = (S.attachments[k] || {})[c.id] || [];
     var uploading = S.uploads[sk] || 0;
     var prioHi = /high|critical/i.test(c.priority || "");
+    var acc = (S.accepted[k] || {})[c.id];
+    var locked = !!(acc && acc.accepted);
 
     var body = el("div", {class: "cm-body"});
     var left = el("div"), right = el("div");
@@ -1793,7 +1862,7 @@
     RESULTS.forEach(function(opt){
       row.appendChild(el("button", {
         class: "result-btn " + opt.cls, "aria-pressed": String(status === opt.key), title: opt.title + " (" + opt.kb.toUpperCase() + ")",
-        "data-fk": "res:" + c.id + ":" + opt.key, type: "button",
+        "data-fk": "res:" + c.id + ":" + opt.key, type: "button", disabled: locked,
         onclick: function(){ setResult(c, opt.key); }
       }, [opt.key, el("kbd", {text: opt.kb.toUpperCase(), "aria-hidden": "true"})]));
     });
@@ -1801,6 +1870,20 @@
     right.appendChild(el("div", {class: "result-meta", text: r.tester
       ? "Last recorded by " + (r.tester === S.tester ? "you" : r.tester) + " · " + timeAgo(r.updatedAt)
       : "Not recorded yet. Run the steps, then pick a result."}));
+
+    if (locked) {
+      right.appendChild(el("div", {class: "lock-banner"}, [
+        icon("lock"),
+        el("span", {}, [el("strong", {text: "Accepted"}), acc.acceptedAt ? " · locked " + timeAgo(acc.acceptedAt) : " · locked",
+          isAdmin() ? "" : " — ask an admin to reopen it to change anything."]),
+        isAdmin() ? el("button", {class: "btn ghost sm", type: "button", text: "Reopen for editing", onclick: function(){ reopenCase(c); }}) : null
+      ]));
+    } else if (isAdmin()) {
+      right.appendChild(el("div", {class: "lock-banner idle"}, [
+        el("span", {text: status === "Not run" ? "Not tested yet." : "Happy with this result?"}),
+        el("button", {class: "btn ghost sm", type: "button", text: "Accept & lock", onclick: function(){ acceptCase(c); }})
+      ]));
+    }
 
     var draft = commentTimers[sk] ? commentTimers[sk].value : (r.comments || "");
     var wantsNote = status === "Fail" || status === "Blocked";
@@ -1815,15 +1898,17 @@
       r.tester && r.tester !== S.tester && r.comments ? el("span", {class: "hint", text: "written by " + r.tester}) : null]));
     var ta = el("textarea", {
       class: "comment-box" + (wantsNote && !draft.trim() ? " want" : ""), id: "cm-" + c.id, "data-fk": "comment:" + c.id,
+      readonly: locked,
       placeholder: status === "Pass" ? "Optional. Anything worth mentioning?" : "What did you see? Include device and app version if relevant."
     });
     ta.value = draft;
     ta.addEventListener("input", function(){
+      if (locked) return;
       if (nudge) { var empty = !ta.value.trim(); nudge.hidden = !empty; ta.classList.toggle("want", empty); }
       if (!S.tester) { askTester(function(){ queueComment(c.id, ta.value); }); return; }
       queueComment(c.id, ta.value);
     });
-    ta.addEventListener("blur", function(){ flushComment(sk); });
+    ta.addEventListener("blur", function(){ if (!locked) flushComment(sk); });
     right.appendChild(ta);
     var saveNode = el("div", {class: "save-state", "data-save": sk, "aria-live": "polite"});
     paintSaveState(saveNode, sk);
@@ -1836,7 +1921,7 @@
       var img = el("img", {alt: a.filename || "Screenshot"});
       var ph = el("span", {class: "ph"}, [el("span", {class: "spinner"})]);
       var thumb = el("div", {class: "shot-thumb", title: (a.tester || "") + " · " + timeAgo(a.createdAt)}, [ph, img,
-        el("button", {class: "rm", type: "button", text: "×", "aria-label": "Delete screenshot " + (a.filename || ""), onclick: function(ev){ ev.stopPropagation(); confirmDeleteAttachment(a); }})
+        locked ? null : el("button", {class: "rm", type: "button", text: "×", "aria-label": "Delete screenshot " + (a.filename || ""), onclick: function(ev){ ev.stopPropagation(); confirmDeleteAttachment(a); }})
       ]);
       img.hidden = true;
       img.addEventListener("click", function(){ openLightbox(a); });
@@ -1845,9 +1930,11 @@
       shotRow.appendChild(thumb);
     });
     for (var u = 0; u < uploading; u++) shotRow.appendChild(el("div", {class: "shot-thumb", "aria-label": "Uploading"}, [el("span", {class: "ph"}, [el("span", {class: "spinner"})])]));
-    var fileInput = el("input", {type: "file", accept: "image/*", "aria-label": "Add screenshot"});
-    fileInput.addEventListener("change", function(){ uploadAttachment(c.id, fileInput.files[0]); fileInput.value = ""; });
-    shotRow.appendChild(el("label", {class: "shot-add"}, [el("span", {class: "plus", text: "+"}), el("span", {text: "Add"}), fileInput]));
+    if (!locked) {
+      var fileInput = el("input", {type: "file", accept: "image/*", "aria-label": "Add screenshot"});
+      fileInput.addEventListener("change", function(){ uploadAttachment(c.id, fileInput.files[0]); fileInput.value = ""; });
+      shotRow.appendChild(el("label", {class: "shot-add"}, [el("span", {class: "plus", text: "+"}), el("span", {text: "Add"}), fileInput]));
+    }
     right.appendChild(shotRow);
     right.appendChild(el("div", {class: "shot-help", text: "Images up to 3 MB. You can also paste a screenshot (Ctrl/⌘+V) while this case is open."}));
     body.appendChild(el("div", {class: "body-cols"}, [left, right]));
