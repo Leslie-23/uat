@@ -1073,7 +1073,7 @@
         ]),
         stackedBar(s, "sb:" + a.id),
         el("span", {class: "meta"}, [
-          el("span", {text: s ? "iOS: " + (iosS ? iosS.done : 0) + ", Android: " + (andS ? andS.done : 0) : "Loading…"}),
+          el("span", {text: s ? "iOS: " + (iosS ? iosS.done : 0) + "/" + (iosS ? iosS.total : 0) + ", Android: " + (andS ? andS.done : 0) + "/" + (andS ? andS.total : 0) : "Loading…"}),
           el("span", {text: s ? s.pct + "%" : ""})
         ])
       ]));
