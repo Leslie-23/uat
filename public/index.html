@@ -301,6 +301,7 @@
   .lock-banner.idle{color:var(--fg-muted)}
   .lock-ico{display:inline-flex;width:13px;height:13px;color:var(--fg-muted)}
   .lock-ico .ico{width:100%;height:100%}
+  .dash-confirmed{display:flex;align-items:center;gap:5px;margin-top:4px}
   .comment-box{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--fg);font-family:var(--font-display);font-size:13px;padding:8px 10px;resize:vertical;min-height:72px;display:block}
   .comment-box:focus{outline:2px solid var(--accent);outline-offset:-1px}
   .comment-box.want{border-color:var(--fail)}
@@ -937,6 +938,18 @@
     return s;
   }
   function tally(){ return projectStats(S.app, S.platform) || {total: 0, done: 0, "Pass": 0, "Fail": 0, "Blocked": 0, "N/A": 0, "Not run": 0, pct: 0}; }
+  // How many case+platform combos are admin-confirmed (locked), across all apps.
+  function confirmedCount(plat){
+    var plats = plat ? [plat] : PLATFORMS.map(function(p){ return p.id; });
+    var n = 0;
+    APPS.forEach(function(a){
+      plats.forEach(function(p){
+        var m = S.accepted[rk(a.id, p)] || {};
+        Object.keys(m).forEach(function(id){ if (m[id] && m[id].accepted) n++; });
+      });
+    });
+    return n;
+  }
   // ---- motion: numbers count up and bars grow from their last value ----
   var REDUCED = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   var animPrev = {}, animQueue = [];
@@ -1997,10 +2010,15 @@
       scopeSeg.appendChild(el("button", {type: "button", "aria-pressed": String(scope === o[0]), "data-fk": "scope:" + o[0], text: o[1], onclick: function(){ S.dashPlat = o[0]; render(); }}));
     });
     var refreshing = S.overviewStatus === "loading";
+    var confirmed = confirmedCount(scope);
     main.appendChild(el("div", {class: "page-head"}, [
       el("div", {}, [
         el("h2", {text: greeting()}),
-        el("p", {text: S.overviewAt ? "Here's where testing stands across " + plural(APPS.length, "project") + ". Updated " + fmtTime(S.overviewAt) + "." : "Loading the latest results…"})
+        el("p", {text: S.overviewAt ? "Here's where testing stands across " + plural(APPS.length, "project") + ". Updated " + fmtTime(S.overviewAt) + "." : "Loading the latest results…"}),
+        confirmed ? el("p", {class: "sub dash-confirmed"}, [
+          el("span", {class: "lock-ico"}, [icon("lock")]),
+          " " + plural(confirmed, "case") + " confirmed" + (scope ? " on " + platLabel(scope) : "")
+        ]) : null
       ]),
       el("div", {class: "page-actions"}, [scopeSeg,
         el("button", {class: "btn", type: "button", disabled: refreshing, "data-fk": "dash-refresh", onclick: function(){
