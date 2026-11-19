@@ -67,6 +67,7 @@ describe("UatClient", () => {
     await c.getAttachmentImage("aaaaaaaaaaaaaaaaaaaaaaa1");
     await c.listHistory({ app: "vip" });
     await c.listNotes("vip");
+    await c.listAcceptances({ app: "vip" });
     await c.close();
     const writes = mock.state.requests.filter((r) => !r.startsWith("GET "));
     expect(writes).toEqual(["POST /api/auth", "POST /api/logout"]);

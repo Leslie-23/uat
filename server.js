@@ -311,7 +311,9 @@ app.get('/api/history', async (req, res) => {
     }
     const db = await getDb();
     const docs = await db.collection('history')
-      .find(filter).sort({ changedAt: -1, _id: -1 }).limit(limit + 1).toArray();
+      // Tester-facing: never expose the forensic ip/userAgent fields.
+      .find(filter, { projection: { ip: 0, userAgent: 0 } })
+      .sort({ changedAt: -1, _id: -1 }).limit(limit + 1).toArray();
     const items = docs.slice(0, limit);
     const last = items[items.length - 1];
     const nextCursor = docs.length > limit && last ? `${new Date(last.changedAt).toISOString()}|${last._id}` : null;

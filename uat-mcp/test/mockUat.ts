@@ -34,12 +34,17 @@ export function fixture() {
       { _id: "aaaaaaaaaaaaaaaaaaaaaaa1", caseId: "VIP-02", app: "vip", platform: "ios", tester: "Ama", filename: "seat.png", mimeType: "image/png", createdAt: iso(3), image: PNG_1PX },
       { _id: "aaaaaaaaaaaaaaaaaaaaaaa2", caseId: "VIP-02", app: "vip", platform: "ios", tester: "Ama", filename: "huge.png", mimeType: "image/png", createdAt: iso(2), image: "A".repeat(400_000) },
     ],
+    acceptances: [
+      { _id: "vip__VIP-01__android", app: "vip", caseId: "VIP-01", platform: "android", accepted: true, acceptedAt: iso(7) },
+      { _id: "vip__VIP-02__ios", app: "vip", caseId: "VIP-02", platform: "ios", accepted: false, acceptedAt: iso(4) },
+    ] as Record<string, unknown>[],
     notes: [{ _id: "n1", app: "vip", tester: "Ama", text: "Testing build 2.4.1 (412) on iPhone 13", createdAt: iso(0) }],
   };
 }
 
 export type MockState = ReturnType<typeof fixture> & {
   historyEnabled: boolean;
+  acceptancesEnabled: boolean;
   /** Fail the next N requests to a path with this status. */
   failNext: Record<string, { status: number; count: number }>;
   /** Invalidate every session (simulates sessions being cleared server-side). */
@@ -52,7 +57,7 @@ export type MockState = ReturnType<typeof fixture> & {
 export async function startMock(overrides: Partial<MockState> = {}) {
   const sessions = new Set<string>();
   const state: MockState = {
-    ...fixture(), historyEnabled: true, failNext: {}, logins: 0, logouts: 0, requests: [],
+    ...fixture(), historyEnabled: true, acceptancesEnabled: true, failNext: {}, logins: 0, logouts: 0, requests: [],
     dropSessions: () => sessions.clear(),
     ...overrides,
   };
@@ -95,6 +100,7 @@ export async function startMock(overrides: Partial<MockState> = {}) {
       return a ? send(200, { image: a.image, mimeType: a.mimeType }) : send(404);
     }
     if (path === "/api/comments") return send(200, by(state.notes, ["app"]));
+    if (path === "/api/acceptances" && state.acceptancesEnabled) return send(200, by(state.acceptances, ["app", "platform"]));
     if (path === "/api/history" && state.historyEnabled) {
       // Same contract as server.js: newest first, cursor "<iso>|<id>".
       let rows = by(state.history, ["app", "caseId", "platform"]).sort(

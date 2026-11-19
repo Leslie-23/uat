@@ -11,6 +11,7 @@ const INSTRUCTIONS = `Read-only access to the UAT Tracker: apps, test cases, res
 - Results: Pass, Fail, Blocked, N/A, or "Not run" when nobody has recorded one. Several testers can record a case; the most recent record is the effective result.
 - There are no test cycles or builds in the UAT platform; scope by app and platform.
 - Evidence is screenshots only.
+- lockedByAdmin: an admin accepted that case+platform, so its result is confirmed and frozen until reopened.
 - These tools cannot change test status. Never report a case as passed because code was changed: only a tester re-running it can confirm that.
 Start with list_apps, then get_failed_tests. The investigate_failures prompt describes the full workflow.`;
 

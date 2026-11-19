@@ -55,6 +55,8 @@ describe("list_apps", () => {
     // VIP-02 on iOS: Kofi Pass, then Ama Fail later → counts as Fail.
     expect(vip.results.ios).toEqual({ Pass: 1, Fail: 1, Blocked: 1, "N/A": 0, "Not run": 0 });
     expect(vip.results.android).toEqual({ Pass: 0, Fail: 1, Blocked: 0, "N/A": 0, "Not run": 2 });
+    // VIP-02 iOS was accepted then reopened (accepted:false), so only VIP-01 Android is locked.
+    expect(vip.lockedByAdmin).toEqual({ ios: 0, android: 1 });
   });
 });
 
@@ -65,7 +67,8 @@ describe("get_failed_tests", () => {
     expect(data.totalMatching).toBe(2);
     expect(data.groups.map((g: any) => g.module)).toEqual(["Bus booking", "Login"]);
     const seat = data.groups[0].cases[0];
-    expect(seat).toMatchObject({ caseId: "VIP-02", platform: "ios", status: "Fail", priority: "Critical", actualResult: "Seat released after 10s", recordedBy: "Ama", screenshots: 2 });
+    expect(seat).toMatchObject({ caseId: "VIP-02", platform: "ios", status: "Fail", priority: "Critical", actualResult: "Seat released after 10s", recordedBy: "Ama", screenshots: 2, lockedByAdmin: false });
+    expect(data.groups[1].cases[0]).toMatchObject({ caseId: "VIP-01", platform: "android", lockedByAdmin: true });
   });
 
   it("can include Blocked, filter by platform and module, and matches app names loosely", async () => {
@@ -103,6 +106,13 @@ describe("get_test_details", () => {
     expect(data.platforms.ios.allTesterRecords.map((r: any) => r.tester)).toEqual(["Ama", "Kofi"]);
     expect(data.platforms.android.status).toBe("Not run");
     expect(data.platforms.ios.screenshots).toBe(2);
+    expect(data.platforms.ios.lockedByAdmin).toBe(false);
+  });
+
+  it("treats deployments without the acceptances endpoint as nothing locked", async () => {
+    const { call } = await connect({ acceptancesEnabled: false });
+    const { data } = await call("get_test_details", { app: "vip", case_id: "VIP-01" });
+    expect(data.platforms.android).toMatchObject({ status: "Fail", lockedByAdmin: false });
   });
 
   it("errors clearly for an unknown case", async () => {

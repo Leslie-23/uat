@@ -30,6 +30,13 @@ export function latestPerCase(records: ResultRecord[]): Map<string, ResultRecord
   return out;
 }
 
+/** Locked (admin-accepted) case+platform keys → when they were accepted. */
+export function lockedMap(rows: { caseId: string; platform: string; accepted: boolean; acceptedAt: string | null }[]): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  for (const a of rows) if (a.accepted) out.set(resultKey(a.caseId, a.platform), a.acceptedAt);
+  return out;
+}
+
 const PRIORITY_RANK: Record<string, number> = { critical: 0, high: 1, "medium-high": 2, medium: 3, low: 4 };
 export function priorityRank(p: string): number {
   return PRIORITY_RANK[p.trim().toLowerCase()] ?? 5;

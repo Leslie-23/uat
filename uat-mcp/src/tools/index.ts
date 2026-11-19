@@ -4,7 +4,7 @@ import { z } from "zod";
 import { UatApiError } from "../api/client.js";
 import type { Attachment, HistoryEntry } from "../api/schemas.js";
 import {
-  PLATFORMS, RECORDED_STATUSES, analyseHistory, findCase, latestPerCase, parseSteps, priorityRank, resultKey, statusOf,
+  PLATFORMS, RECORDED_STATUSES, analyseHistory, findCase, latestPerCase, lockedMap, parseSteps, priorityRank, resultKey, statusOf,
   type Platform, type Status,
 } from "../domain/results.js";
 import { READ_ONLY, decodeCursor, encodeCursor, ok, resolveApp, safe, type ToolContext } from "./util.js";
@@ -12,6 +12,9 @@ import { READ_ONLY, decodeCursor, encodeCursor, ok, resolveApp, safe, type ToolC
 const platformArg = z.enum(PLATFORMS).optional().describe('Limit to one platform: "ios" or "android". Omit for both.');
 const appArg = z.string().min(1).describe('App id from list_apps, e.g. "vip". Matching ignores case and spaces.');
 const caseArg = z.string().min(1).describe('Test case id, e.g. "VIP-04".');
+
+const LOCK_NOTE =
+  "lockedByAdmin means an admin accepted (locked) that case+platform: its result is confirmed and can't be changed until an admin reopens it. A locked Fail is a confirmed failure.";
 
 const ACTUAL_RESULT_NOTE =
   "actualResult is the tester's free-text note. It may be empty, and when several testers recorded a case it belongs to whoever recorded last.";
@@ -34,21 +37,25 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       annotations: READ_ONLY,
     },
     safe(async () => {
-      const [cases, results] = await Promise.all([client.listTestCases(), client.listResults()]);
+      const [cases, results, acceptances] = await Promise.all([client.listTestCases(), client.listResults(), client.listAcceptances()]);
       const latest = latestPerCase(results);
-      const apps = new Map<string, { caseCount: number; modules: Set<string>; byPlatform: Record<string, Record<Status, number>> }>();
+      const locked = lockedMap(acceptances);
+      const apps = new Map<string, { caseCount: number; modules: Set<string>; byPlatform: Record<string, Record<Status, number>>; locked: Record<string, number> }>();
       for (const c of cases) {
         let a = apps.get(c.app);
         if (!a) {
-          a = { caseCount: 0, modules: new Set(), byPlatform: Object.fromEntries(PLATFORMS.map((p) => [p, countByStatus()])) };
+          a = { caseCount: 0, modules: new Set(), byPlatform: Object.fromEntries(PLATFORMS.map((p) => [p, countByStatus()])), locked: Object.fromEntries(PLATFORMS.map((p) => [p, 0])) };
           apps.set(c.app, a);
         }
         a.caseCount++;
         if (c.module) a.modules.add(c.module);
-        for (const p of PLATFORMS) a.byPlatform[p]![statusOf(latest.get(resultKey(c.id, p)))]++;
+        for (const p of PLATFORMS) {
+          a.byPlatform[p]![statusOf(latest.get(resultKey(c.id, p)))]++;
+          if (locked.has(resultKey(c.id, p))) a.locked[p]!++;
+        }
       }
       return ok({
-        apps: [...apps].map(([app, a]) => ({ app, caseCount: a.caseCount, moduleCount: a.modules.size, results: a.byPlatform })),
+        apps: [...apps].map(([app, a]) => ({ app, caseCount: a.caseCount, moduleCount: a.modules.size, results: a.byPlatform, lockedByAdmin: a.locked })),
         platforms: PLATFORMS,
       });
     }),
@@ -77,12 +84,14 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     safe(async ({ app, platform, statuses, module, limit, cursor }) => {
       const appId = await resolveApp(ctx, app);
       const offset = decodeCursor(cursor);
-      const [cases, results, attachments] = await Promise.all([
+      const [cases, results, attachments, acceptances] = await Promise.all([
         client.listTestCases(appId),
         client.listResults({ app: appId, platform }),
         client.listAttachments({ app: appId, platform }),
+        client.listAcceptances({ app: appId, platform }),
       ]);
       const latest = latestPerCase(results);
+      const locked = lockedMap(acceptances);
       const shots = new Map<string, number>();
       for (const a of attachments) {
         const k = resultKey(a.caseId, a.platform ?? "");
@@ -105,6 +114,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             actualResult: rec?.comments?.trim() || null,
             recordedBy: rec?.tester ?? null, recordedAt: rec?.updatedAt ?? null,
             screenshots: shots.get(resultKey(c.id, p)) ?? 0,
+            lockedByAdmin: locked.has(resultKey(c.id, p)),
             order: c.order,
           });
         }
@@ -134,7 +144,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
         summary: { byPlatform, byModule },
         groups,
         nextCursor: next,
-        notes: [ACTUAL_RESULT_NOTE, "Use get_test_details for steps and every tester's record, and get_test_evidence for screenshots."],
+        notes: [ACTUAL_RESULT_NOTE, LOCK_NOTE, "Use get_test_details for steps and every tester's record, and get_test_evidence for screenshots."],
       });
     }),
   );
@@ -155,10 +165,12 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       const cases = await client.listTestCases(appId);
       const tc = findCase(cases, case_id);
       if (!tc) throw new UatApiError(`No test case "${case_id}" in ${appId}. It has ${cases.length} cases, e.g. ${cases.slice(0, 3).map((c) => c.id).join(", ")}.`, "unknown_case");
-      const [results, attachments] = await Promise.all([
+      const [results, attachments, acceptances] = await Promise.all([
         client.listResults({ app: appId }),
         client.listAttachments({ app: appId, caseId: tc.id }),
+        client.listAcceptances({ app: appId }),
       ]);
+      const locked = lockedMap(acceptances);
       const mine = results.filter((r) => r.caseId === tc.id);
       const latest = latestPerCase(mine);
       const platforms = Object.fromEntries(
@@ -174,6 +186,8 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
             recordedBy: rec?.tester ?? null,
             recordedAt: rec?.updatedAt ?? null,
             screenshots: attachments.filter((a) => a.platform === p).length,
+            lockedByAdmin: locked.has(resultKey(tc.id, p)),
+            lockedAt: locked.get(resultKey(tc.id, p)) ?? null,
             allTesterRecords: records,
           }];
         }),
@@ -184,7 +198,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
           steps: parseSteps(tc.steps), expected: tc.expected,
         },
         platforms,
-        notes: [ACTUAL_RESULT_NOTE],
+        notes: [ACTUAL_RESULT_NOTE, LOCK_NOTE],
       });
     }),
   );

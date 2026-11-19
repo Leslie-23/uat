@@ -95,6 +95,19 @@ export const HistoryPage = z.object({
 });
 export type HistoryPage = z.infer<typeof HistoryPage>;
 
+/**
+ * acceptances collection: an admin can accept (lock) a case+platform once its result
+ * is confirmed. While locked, nobody can change its result, notes or screenshots.
+ */
+export const Acceptance = z.object({
+  app: z.string(),
+  caseId: z.string(),
+  platform: z.string(),
+  accepted: z.boolean().nullish().transform((v) => v === true),
+  acceptedAt: optText,
+});
+export type Acceptance = z.infer<typeof Acceptance>;
+
 /** comments collection: app-level notes, not tied to a case. */
 export const AppNote = z.object({
   app: z.string(),

@@ -211,6 +211,16 @@ export class UatClient {
     }
   }
 
+  /** Admin accept/lock state per case+platform. Older deployments without the endpoint report nothing as locked. */
+  async listAcceptances(q: { app?: string; platform?: string } = {}): Promise<S.Acceptance[]> {
+    try {
+      return await this.get("/api/acceptances", z.array(S.Acceptance), q);
+    } catch (e) {
+      if (e instanceof UatApiError && e.status === 404) return [];
+      throw e;
+    }
+  }
+
   /** App-level notes (newest first, max 200 server-side). */
   listNotes(app: string): Promise<S.AppNote[]> {
     return this.get("/api/comments", z.array(S.AppNote), { app });

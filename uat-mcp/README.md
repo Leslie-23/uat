@@ -21,6 +21,7 @@ There is also a prompt, **`investigate_failures`** (`app`, optional `platform`, 
 - Statuses are **Pass, Fail, Blocked, N/A**, or **Not run** when nobody has recorded one.
 - Several testers can record the same case. The **most recent record per case and platform** is the effective result, the same rule the UAT dashboard uses.
 - `actualResult` is the tester's free-text note. UAT has no separate "actual result" field, so it may be empty.
+- **`lockedByAdmin`**: an admin accepted (locked) that case+platform, so its result is confirmed and can't change until it's reopened. A locked Fail is a confirmed failure. Read from `GET /api/acceptances`; deployments without it show nothing as locked.
 - Evidence is **screenshots only**. UAT doesn't store videos or logs.
 - UAT has **no test cycles or builds**, so everything is scoped by app and platform (`ios` / `android`).
 
@@ -35,7 +36,7 @@ There is also a prompt, **`investigate_failures`** (`app`, optional `platform`, 
 ```bash
 cd uat-mcp
 npm install        # also builds dist/
-npm test           # optional: 31 tests, no network or database needed
+npm test           # optional: 32 tests, no network or database needed
 ```
 
 ### Add it to Claude Code (in the app repo you want fixed)
