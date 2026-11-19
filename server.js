@@ -289,6 +289,38 @@ app.post('/api/comments', async (req, res) => {
   }
 });
 
+// Read-only change history for testers and integrations (e.g. the UAT MCP
+// server), newest first, with cursor pagination.
+// GET /api/history?app=&caseId=&platform=&limit=&cursor=
+// → { items: [...], nextCursor: string | null }
+app.get('/api/history', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.app) filter.app = String(req.query.app);
+    if (req.query.caseId) filter.caseId = String(req.query.caseId);
+    if (req.query.platform) filter.platform = String(req.query.platform);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+    if (req.query.cursor) {
+      // Cursor = "<changedAt ISO>|<ObjectId>" of the last item on the previous page.
+      const [iso, id] = String(req.query.cursor).split('|');
+      const at = new Date(iso);
+      if (isNaN(at.getTime()) || !ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'invalid cursor' });
+      }
+      filter.$or = [{ changedAt: { $lt: at } }, { changedAt: at, _id: { $lt: new ObjectId(id) } }];
+    }
+    const db = await getDb();
+    const docs = await db.collection('history')
+      .find(filter).sort({ changedAt: -1, _id: -1 }).limit(limit + 1).toArray();
+    const items = docs.slice(0, limit);
+    const last = items[items.length - 1];
+    const nextCursor = docs.length > limit && last ? `${new Date(last.changedAt).toISOString()}|${last._id}` : null;
+    res.json({ items, nextCursor });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- admin-only ---------------------------------------------------------
 app.use('/api/admin', requireRole('admin'));
 

@@ -34,6 +34,7 @@ async function main() {
   }
   await col.createIndex({ app: 1, order: 1 });
   await db.collection('results').createIndex({ app: 1 });
+  await db.collection('history').createIndex({ app: 1, caseId: 1, changedAt: -1 });
   console.log(`Seeded ${n} test cases into "${DB_NAME}.testcases".`);
   await client.close();
 }

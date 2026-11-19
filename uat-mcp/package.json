@@ -1,0 +1,34 @@
+{
+  "name": "uat-mcp",
+  "version": "0.1.0",
+  "description": "Read-only MCP server that exposes UAT Tracker test results (failures, details, evidence, history) to MCP clients such as Claude Code.",
+  "type": "module",
+  "bin": {
+    "uat-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && vitest run",
+    "prepare": "tsc -p tsconfig.json"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}
